@@ -26,21 +26,21 @@ class NukeCog(commands.Cog):
             # 元のチャンネルを削除
             await channel.delete(reason=f"Nuked by {interaction.user}")
 
-            # 埋め込みを作成し、指定されたTenorのGIF直リンクを配置
+            # 1. 埋め込みを送信
             embed = discord.Embed(
                 title="💥 チャンネルを初期化しました！",
                 color=0x3498db
             )
-            embed.set_image(url="https://media1.tenor.com/m/VRF-66wvOe4AAAAC/megumin-explosion-megumin-konosuba.gif")
             embed.timestamp = discord.utils.utcnow()
-
-            # 新しく生成されたチャンネルにメッセージを送信
             await new_channel.send(embed=embed)
+
+            # 2. その下にGIFのリンクを送信（Discordが自動で動くGIFに展開します）
+            await new_channel.send("https://media1.tenor.com/m/VRF-66wvOe4AAAAC/megumin-explosion-megumin-konosuba.gif")
 
         except Exception as error:
             print(error)
             try:
-                await interaction.editReply(content="❌ チャンネルの初期化に失敗しました（Botの管理者権限やチャンネル管理権限を確認してください）。")
+                await interaction.editReply(content="❌ チャンネルの初期化に失敗しました。")
             except Exception:
                 pass
 
