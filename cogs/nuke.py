@@ -26,12 +26,12 @@ class NukeCog(commands.Cog):
             # 元のチャンネルを削除
             await channel.delete(reason=f"Nuked by {interaction.user}")
 
-            # 埋め込みを作成し、指定されたTenorのGIFを配置
+            # 埋め込みを作成し、指定されたTenorのGIF直リンクを配置
             embed = discord.Embed(
                 title="💥 チャンネルを初期化しました！",
                 color=0x3498db
             )
-            embed.set_image(url="https://tenor.com/hsYNUQdAYeo.gif")
+            embed.set_image(url="https://media1.tenor.com/m/VRF-66wvOe4AAAAC/megumin-explosion-megumin-konosuba.gif")
             embed.timestamp = discord.utils.utcnow()
 
             # 新しく生成されたチャンネルにメッセージを送信
