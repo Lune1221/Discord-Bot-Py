@@ -34,8 +34,9 @@ class NukeCog(commands.Cog):
             embed.timestamp = discord.utils.utcnow()
             await new_channel.send(embed=embed)
 
-            # 2. その下にGIFのリンクを送信（Discordが自動で動くGIFに展開します）
-            await new_channel.send("https://media1.tenor.com/m/VRF-66wvOe4AAAAC/megumin-explosion-megumin-konosuba.gif")
+            # 2. その下にMP4動画のリンクを送信（Discordが動画プレイヤーとして自動展開します）
+            # ※お好みのMP4ファイルのURL、またはTenor等の動画リンクに置き換えてください
+            await new_channel.send("https://example.com/your_video.mp4")
 
         except Exception as error:
             print(error)
