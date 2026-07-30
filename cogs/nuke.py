@@ -2,47 +2,47 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-class Nuke(commands.Cog):
+class NukeCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="nuke", description="現在のチャンネルを初期化します")
+    @app_commands.command(
+        name="nuke",
+        description="現在のチャンネルを初期化（再作成）します【管理者専用】"
+    )
     @app_commands.checks.has_permissions(administrator=True)
     async def nuke(self, interaction: discord.Interaction):
-        if not interaction.guild:
-            return
-
+        # チャンネルが削除されるため、先にインタラクションを応答（非公開）しておく
+        await interaction.response.defer(ephemeral=True)
+        
         channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            return await interaction.editReply(content="❌ テキストチャンネルでのみ実行可能です。")
 
         try:
-            # 現在のチャンネル設定を引き継いでクローン（複製）を作成
-            cloned = await channel.clone(
-                name=channel.name,
-                reason=f"{interaction.user} によってチャンネルが初期化されました"
-            )
+            # 現在のチャンネルの設定を引き継いでクローン（複製）を作成
+            new_channel = await channel.clone(reason=f"Nuked by {interaction.user}")
+            
+            # 元のチャンネルを削除
+            await channel.delete(reason=f"Nuked by {interaction.user}")
 
-            # 埋め込みメッセージと爆発GIFを設定
+            # 埋め込みを作成し、指定されたTenorのGIFを配置
             embed = discord.Embed(
-                title="💥 チャンネル初期化 (Nuke)",
-                description=f"{interaction.user.mention} によってチャンネルが初期化されました！",
-                color=0xff4500
+                title="💥 チャンネルを初期化しました！",
+                color=0x3498db
             )
-            embed.set_image(url="https://media.giphy.com/media/3ohzdWq8xlkscbDRxC/giphy.gif")
+            embed.set_image(url="https://tenor.com/hsYNUQdAYeo.gif")
             embed.timestamp = discord.utils.utcnow()
 
-            # 新しいチャンネルに埋め込みを送信
-            await cloned.send(embed=embed)
-
-            # 古いチャンネルを削除
-            await channel.delete()
+            # 新しく生成されたチャンネルにメッセージを送信
+            await new_channel.send(embed=embed)
 
         except Exception as error:
-            print(f"Nukeコマンドエラー: {error}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "❌ チャンネルの初期化に失敗しました。ボットに「チャンネルの管理」権限があるか確認してください。",
-                    ephemeral=True
-                )
+            print(error)
+            try:
+                await interaction.editReply(content="❌ チャンネルの初期化に失敗しました（Botの管理者権限やチャンネル管理権限を確認してください）。")
+            except Exception:
+                pass
 
 async def setup(bot):
-    await bot.add_cog(Nuke(bot))
+    await bot.add_cog(NukeCog(bot))
