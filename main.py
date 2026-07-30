@@ -79,13 +79,13 @@ async def init_database(pool):
 # --- 3. Discordボットのメインクラス ---
 class MyBot(commands.Bot):
     def __init__(self):
-        # JS版と同等のインテントを設定
+        # discord.py v2以降の正しいインテント設定
         intents = discord.Intents.default()
         intents.guilds = True
-        intents.guild_messages = True
+        intents.messages = True          # guild_messages ではなく messages
         intents.message_content = True
-        intents.guild_members = True
-        intents.guild_voice_states = True
+        intents.members = True           # guild_members ではなく members に修正
+        intents.voice_states = True      # guild_voice_states ではなく voice_states
 
         super().__init__(command_prefix="!", intents=intents)
         self.pool = None
@@ -94,7 +94,6 @@ class MyBot(commands.Bot):
         # PostgreSQL接続プールを作成 (Renderの DATABASE_URL を使用)
         database_url = os.getenv("DATABASE_URL")
         if database_url:
-            # SSL接続のオプションが必要な場合は ssl="require" などを指定
             self.pool = await asyncpg.create_pool(dsn=database_url, ssl="require")
             await init_database(self.pool)
         else:
@@ -104,7 +103,8 @@ class MyBot(commands.Bot):
         if os.path.exists("./cogs"):
             for filename in os.listdir("./cogs"):
                 if filename.endswith(".py"):
-                    await self.load_extension(f"cogs.{filename[:-3]}")
+                    extension_name = f"cogs.{filename[:-3]}"
+                    await self.load_extension(extension_name)
                     print(f"📁 Cog読み込み完了: {filename}")
 
         # スラッシュコマンドの同期
