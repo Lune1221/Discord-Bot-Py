@@ -2,6 +2,10 @@ import os
 import discord
 from discord.ext import commands
 import asyncpg
+from dotenv import load_dotenv
+
+# ローカル環境用：.envファイルから環境変数を読み込む
+load_dotenv()
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -32,5 +36,10 @@ class MyBot(commands.Bot):
 
 bot = MyBot()
 
-# ボットのトークンを設定
-bot.run("YOUR_BOT_TOKEN")
+# 環境変数からトークンを取得（変数名は DISCORD_TOKEN としています）
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+if not TOKEN:
+    print("❌ エラー: DISCORD_TOKEN が環境変数に設定されていません。")
+else:
+    bot.run(TOKEN)
