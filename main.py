@@ -1,12 +1,36 @@
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import discord
 from discord.ext import commands
 import asyncpg
 from dotenv import load_dotenv
 
-# ローカル環境用：.envファイルから環境変数を読み込む
+# ローカル環境用
 load_dotenv()
 
+# --- 1. Renderのポート要件を満たすための簡易Webサーバー ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+    
+    # ログを大量に出さないようにする設定
+    def log_message(self, format, *args):
+        pass
+
+def run_web_server():
+    # Renderから指定されるポート番号（デフォルトは10000）を取得
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# 別スレッドでWebサーバーを起動しておく
+threading.Thread(target=run_web_server, daemon=True).start()
+
+
+# --- 2. Discordボットのメイン処理 ---
 class MyBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -16,17 +40,12 @@ class MyBot(commands.Bot):
         self.pool = None
 
     async def setup_hook(self):
-        # データベース接続（必要に応じて設定してください）
-        # self.pool = await asyncpg.create_pool(user="...", password="...", database="...", host="...")
-        
-        # cogsフォルダ内のファイルを自動読み込み
         if os.path.exists("./cogs"):
             for filename in os.listdir("./cogs"):
                 if filename.endswith(".py"):
                     await self.load_extension(f"cogs.{filename[:-3]}")
                     print(f"📁 読み込み完了: {filename}")
 
-        # スラッシュコマンドの同期
         await self.tree.sync()
         print("🌐 スラッシュコマンドを同期しました。")
 
@@ -36,7 +55,6 @@ class MyBot(commands.Bot):
 
 bot = MyBot()
 
-# 環境変数からトークンを取得（変数名は DISCORD_TOKEN としています）
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
