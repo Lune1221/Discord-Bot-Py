@@ -2,8 +2,8 @@ import asyncio
 import os
 import threading
 import asyncpg
-from discord.ext import commands
 import discord
+from discord.ext import commands
 from dotenv import load_dotenv
 from flask import Flask
 
@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-  return "Botは24時間稼働中です！"
+  return "Botは24時間稼働中です！", 200
 
 
 def run_web():
@@ -46,43 +46,54 @@ intents.message_content = True
 intents.members = True
 intents.voice_states = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+class MyBot(commands.Bot):
+
+  async def setup_hook(self):
+    # PostgreSQLのプールを作成し、データベースを初期化
+    database_url = os.environ.get("DATABASE_URL")
+    self.pool = await asyncpg.create_pool(database_url)
+    await init_database(self.pool)
+
+    # cogs フォルダ内のファイルをすべて自動読み込み
+    if os.path.exists("./cogs"):
+      for filename in os.listdir("./cogs"):
+        if filename.endswith(".py"):
+          cog_name = f"cogs.{filename[:-3]}"
+          await self.load_extension(cog_name)
+          print(f"読み込みました: {cog_name}")
+
+    # スラッシュコマンドの同期
+    try:
+      TEST_GUILD_ID = discord.Object(id=1464160132765319305)
+      await self.tree.sync(guild=TEST_GUILD_ID)
+      print("指定サーバーへのコマンド同期が完了しました！")
+    except Exception as e:
+      print(f"同期に失敗しました: {e}")
+
+
+bot = MyBot(command_prefix="!", intents=intents)
 
 
 @bot.event
 async def on_ready():
   print(f"ログインしました: {bot.user}")
-  try:
-    TEST_GUILD_ID = discord.Object(id=1464160132765319305)
-    # 🟢 重複を防ぐため copy_global_to を削除し、サーバー専用の同期だけに絞ります
-    await bot.tree.sync(guild=TEST_GUILD_ID)
-    print("指定サーバーへのコマンド同期が完了しました！")
-  except Exception as e:
-    print(f"同期に失敗しました: {e}")
 
 
 async def main():
-  # Webサーバーを別スレッドでバックグラウンド起動
+  # 1. Webサーバー（Flask）を別スレッドでバックグラウンド起動（Render対策）
   threading.Thread(target=run_web, daemon=True).start()
 
-  # PostgreSQLのプールを作成し、データベースを初期化
-  database_url = os.environ.get("DATABASE_URL")
-  pool = await asyncpg.create_pool(database_url)
-  await init_database(pool)
+  # 2. ボットの起動（トークンは DISCORD_TOKEN または DISCORD_BOT_TOKEN に対応）
+  token = os.environ.get("DISCORD_TOKEN") or os.environ.get(
+      "DISCORD_BOT_TOKEN"
+  )
+  if not token:
+    print(
+        "❌ エラー: DISCORD_TOKEN（または DISCORD_BOT_TOKEN）が設定されていません。"
+    )
+    return
 
-  # ボットからデータベースプールを参照できるようにする
-  bot.pool = pool
-
-  # cogs フォルダ内のファイルをすべて読み込む
-  if os.path.exists("./cogs"):
-    for filename in os.listdir("./cogs"):
-      if filename.endswith(".py"):
-        cog_name = f"cogs.{filename[:-3]}"
-        await bot.load_extension(cog_name)
-        print(f"読み込みました: {cog_name}")
-
-  # ボットの起動
-  token = os.environ.get("DISCORD_TOKEN")
   await bot.start(token)
 
 
