@@ -5,7 +5,7 @@ import asyncpg
 from discord.ext import commands
 import discord
 from dotenv import load_dotenv
-from Flask import Flask
+from flask import Flask  # 👈 小文字の flask に修正しました
 
 # 環境変数の読み込み
 load_dotenv()
@@ -52,7 +52,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
   print(f"ログインしました: {bot.user}")
-  # 🟢 ログインが完了した安全なタイミングで、指定サーバーへ即時同期する
   try:
     TEST_GUILD_ID = discord.Object(id=1464160132765319305)
     bot.tree.copy_global_to(guild=TEST_GUILD_ID)
