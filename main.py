@@ -1,8 +1,13 @@
+import logging
 import os
 import threading
 import discord
 from discord.ext import commands
 from flask import Flask
+
+# Flask（Werkzeug）の開発サーバー警告とアクセスログを非表示にする
+log = logging.getLogger("werkzeug")
+log.setLevel(logging.ERROR)
 
 # --- 1. Flaskサーバーの準備 ---
 app = Flask(__name__)
