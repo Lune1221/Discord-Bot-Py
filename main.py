@@ -38,13 +38,13 @@ async def init_database(pool):
         """)
 
 
-# インテントの設定（修正箇所）
+# インテントの設定
 intents = discord.Intents.default()
 intents.guilds = True
 intents.guild_messages = True
 intents.message_content = True
-intents.members = True  # 👈 guild_members から変更
-intents.voice_states = True  # 👈 guild_voice_states から変更
+intents.members = True
+intents.voice_states = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -66,9 +66,26 @@ async def main():
   # ボットからデータベースプールを参照できるようにする
   bot.pool = pool
 
-  # ボットの起動
-  token = os.environ.get("DISCORD_TOKEN")
-  await bot.start(token)
+  # cogs フォルダ内のファイルをすべて読み込む
+  if os.path.exists("./cogs"):
+    for filename in os.listdir("./cogs"):
+      if filename.endswith(".py"):
+        cog_name = f"cogs.{filename[:-3]}"
+        await bot.load_extension(cog_name)
+        print(f"読み込みました: {cog_name}")
+
+  async with bot:
+    # 🟢 ご提示いただいたサーバーID（1464160132765319305）に即時同期します
+    TEST_GUILD_ID = discord.Object(id=1464160132765319305)
+
+    print("指定サーバーへコマンドを即時同期中...")
+    bot.tree.copy_global_to(guild=TEST_GUILD_ID)
+    await bot.tree.sync(guild=TEST_GUILD_ID)
+    print("同期が完了しました！")
+
+    # ボットの起動
+    token = os.environ.get("DISCORD_TOKEN")
+    await bot.start(token)
 
 
 if __name__ == "__main__":
