@@ -36,21 +36,18 @@ async def on_ready():
       f"=== ログイン成功: {bot.user.name} (ID: {bot.user.id}) ===", flush=True
   )
 
-  # 1. バッドアップル用のコグを読み込み
-  try:
-    await bot.load_extension("cogs.bad_apple_discord_player")
-    print("読み込み成功: cogs.bad_apple_discord_player", flush=True)
-  except Exception as e:
-    print(f"【読み込み失敗】Bad Apple: {e}", flush=True)
+  # 【重要】cogs フォルダ内にあるすべての .py ファイルを自動で一括読み込みする
+  if os.path.exists("./cogs"):
+    for filename in os.listdir("./cogs"):
+      if filename.endswith(".py"):
+        cog_name = f"cogs.{filename[:-3]}"
+        try:
+          await bot.load_extension(cog_name)
+          print(f"読み込み成功: {cog_name}", flush=True)
+        except Exception as e:
+          print(f"【読み込み失敗】 {cog_name}: {e}", flush=True)
 
-  # 2. 画像をAAにするコグを読み込み（※ファイル名を image_to_aa.py にした場合）
-  try:
-    await bot.load_extension("cogs.image_to_aa")
-    print("読み込み成功: cogs.image_to_aa", flush=True)
-  except Exception as e:
-    print(f"【読み込み失敗】Image to AA: {e}", flush=True)
-
-  # 3. 【最重要】スラッシュコマンドをDiscordに同期する
+  # スラッシュコマンドをDiscordに同期する
   try:
     synced = await bot.tree.sync()
     print(
