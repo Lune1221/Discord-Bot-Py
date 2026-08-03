@@ -29,18 +29,12 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
   print(f"=== ログイン成功: {bot.user.name} (ID: {bot.user.id}) ===")
 
-  # cogsフォルダ内のファイルを自動読み込み
-  if os.path.exists("./cogs"):
-    for filename in os.listdir("./cogs"):
-      if filename.endswith(".py"):
-        cog_name = f"cogs.{filename[:-3]}"
-        try:
-          await bot.load_extension(cog_name)
-          print(f"読み込み成功: {cog_name}")
-        except Exception as e:
-          print(f"読み込み失敗 {cog_name}: {e}")
-  else:
-    print("警告: cogsフォルダが見つかりません。")
+  # 明示的に bad_apple_discord_player を読み込む
+  try:
+    await bot.load_extension("cogs.bad_apple_discord_player")
+    print("読み込み成功: cogs.bad_apple_discord_player")
+  except Exception as e:
+    print(f"読み込み失敗: {e}")
 
 
 # --- 3. メイン起動処理 ---
@@ -58,7 +52,9 @@ if __name__ == "__main__":
   if not token:
     print("【エラー】DISCORD_TOKEN が環境変数に設定されていません！")
   else:
-    print(f"DISCORD_TOKEN を取得しました（文字数: {len(token)}）。ボットを起動します...")
+    print(
+        f"DISCORD_TOKEN を取得しました（文字数: {len(token)}）。ボットを起動します..."
+    )
     try:
       bot.run(token)
     except Exception as e:
