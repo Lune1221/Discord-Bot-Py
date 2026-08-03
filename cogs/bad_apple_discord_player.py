@@ -5,6 +5,7 @@ import pickle
 import time
 from discord.ext import commands
 from PIL import Image
+from supabase import create_client
 
 ASCII_CHARS = ["⠀", "⠄", "⠆", "⠖", "⠶", "⡶", "⣩", "⣪", "⣫", "⣾", "⣿"]
 ASCII_CHARS.reverse()
@@ -13,6 +14,14 @@ ASCII_CHARS = ASCII_CHARS[::-1]
 WIDTH = 60
 TIMEOUT = 0.13
 CACHE_FILE = "bad_apple_cache.pkl"
+BUCKET_NAME = "bad-apple-cache"  # Supabaseで作成したバケット名
+
+# Supabaseクライアントの初期化
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+supabase = None
+if SUPABASE_URL and SUPABASE_KEY:
+  supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def resize(image, new_width=WIDTH):
@@ -68,16 +77,32 @@ class BadApple(commands.Cog):
         f"Bad Apple: {len(self.frame_files)}枚のフレームファイルを確認しました。"
     )
 
-    # 起動時にキャッシュファイルがあれば自動で読み込む
+    # 1. まずローカルにキャッシュがあればそこから読み込む
     if os.path.exists(CACHE_FILE):
       try:
         with open(CACHE_FILE, "rb") as f:
           self.frames = pickle.load(f)
         print(
-            f"Bad Apple: キャッシュから {len(self.frames)} フレームを読み込みました！"
+            f"Bad Apple: ローカルキャッシュから {len(self.frames)}"
+            " フレームを読み込みました！"
         )
       except Exception as e:
-        print(f"Bad Apple: キャッシュの読み込みに失敗しました: {e}")
+        print(f"Bad Apple: ローカルキャッシュの読み込みに失敗しました: {e}")
+
+    # 2. ローカルになくても Supabase が設定されていればストレージから取得を試みる
+    if not self.frames and supabase:
+      try:
+        res = supabase.storage.from_(BUCKET_NAME).download(CACHE_FILE)
+        with open(CACHE_FILE, "wb") as f:
+          f.write(res)
+        with open(CACHE_FILE, "rb") as f:
+          self.frames = pickle.load(f)
+        print(
+            f"Bad Apple: Supabaseからキャッシュを復元しました！"
+            f" ({len(self.frames)} フレーム)"
+        )
+      except Exception as e:
+        print(f"Bad Apple: Supabaseからのキャッシュ取得はありませんでした: {e}")
 
   @commands.command(name="bad_apple", aliases=["badapple"])
   async def bad_apple(self, ctx):
@@ -99,15 +124,32 @@ class BadApple(commands.Cog):
           res = runner(path)
           if res:
             loaded.append(res)
+
+        # ローカルに保存
         try:
           with open(CACHE_FILE, "wb") as f:
             pickle.dump(loaded, f)
         except Exception as e:
-          print(f"キャッシュの保存に失敗しました: {e}")
+          print(f"ローカルキャッシュの保存に失敗しました: {e}")
+
+        # Supabase Storageにもアップロード（永続化）
+        if supabase:
+          try:
+            with open(CACHE_FILE, "rb") as f:
+              file_bytes = f.read()
+            supabase.storage.from_(BUCKET_NAME).upload(
+                path=CACHE_FILE,
+                file=file_bytes,
+                file_options={"upsert": "true"},  # 既に存在する場合は上書き
+            )
+            print("Bad Apple: Supabaseへキャッシュをアップロードしました。")
+          except Exception as e:
+            print(f"Supabaseへのアップロードに失敗しました: {e}")
+
         return loaded
 
       self.frames = await asyncio.to_thread(load_and_cache_frames)
-      # 完了メッセージに書き換える代わりにメッセージを削除する
+      # 変換が終わったらメッセージを削除する
       await status_msg.delete()
 
     if not self.frames:
