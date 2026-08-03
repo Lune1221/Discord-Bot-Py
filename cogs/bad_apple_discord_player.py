@@ -1,56 +1,8 @@
-import asyncio
-import glob
-import os
-import pickle
 import time
 from discord.ext import commands
-from PIL import Image
-
-ASCII_CHARS = ["⠀", "⠄", "⠆", "⠖", "⠶", "⡶", "⣩", "⣪", "⣫", "⣾", "⣿"]
-ASCII_CHARS.reverse()
-ASCII_CHARS = ASCII_CHARS[::-1]
 
 WIDTH = 60
 TIMEOUT = 0.13
-CACHE_FILE = "bad_apple_cache.pkl"
-
-
-def resize(image, new_width=WIDTH):
-  old_width, old_height = image.size
-  aspect_ratio = float(old_height) / float(old_width)
-  new_height = int((aspect_ratio * new_width) / 2)
-  return image.resize((new_width, new_height))
-
-
-def grayscalify(image):
-  return image.convert("L")
-
-
-def modify(image, buckets=25):
-  initial_pixels = list(image.getdata())
-  new_pixels = [
-      ASCII_CHARS[pixel_value // buckets] for pixel_value in initial_pixels
-  ]
-  return "".join(new_pixels)
-
-
-def do(image, new_width=WIDTH):
-  image = resize(image)
-  image = grayscalify(image)
-  pixels = modify(image)
-  len_pixels = len(pixels)
-  return "\n".join([
-      pixels[index : index + int(new_width)]
-      for index in range(0, len_pixels, int(new_width))
-  ])
-
-
-def runner(path):
-  try:
-    image = Image.open(path)
-  except Exception:
-    return None
-  return do(image)
 
 
 class BadApple(commands.Cog):
@@ -58,59 +10,22 @@ class BadApple(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
     self.frames = []
-    self.frame_files = sorted(
-        glob.glob("frames/frame*.jpg"),
-        key=lambda x: int(
-            os.path.basename(x).replace("frame", "").replace(".jpg", "")
-        ),
-    )
-    print(
-        f"Bad Apple: {len(self.frame_files)}枚のフレームファイルを確認しました。"
-    )
 
-    # 安全にキャッシュを読み込む
-    if os.path.exists(CACHE_FILE):
-      try:
-        with open(CACHE_FILE, "rb") as f:
-          self.frames = pickle.load(f)
-        print(
-            f"Bad Apple: キャッシュから {len(self.frames)} フレームを読み込みました！"
-        )
-      except Exception as e:
-        print(f"Bad Apple: キャッシュの読み込みに失敗しました（無視して続行します）: {e}")
-        self.frames = []
+    # Pythonファイルから一瞬で読み込む
+    try:
+      from frames_data import FRAMES
+
+      self.frames = FRAMES
+      print(f"Bad Apple: プリセットから {len(self.frames)} フレームを読み込みました！")
+    except Exception as e:
+      print(f"Bad Apple: フレームデータの読み込みに失敗しました: {e}")
 
   @commands.command(name="bad_apple", aliases=["badapple"])
   async def bad_apple(self, ctx):
-    if not self.frame_files and not self.frames:
+    if not self.frames:
       await ctx.send(
-          "フレームファイルが見つかりません（frames/ フォルダを確認してください）。"
+          "フレームデータ（frames_data.py）が読み込まれていません。"
       )
-      return
-
-    if not self.frames:
-      status_msg = await ctx.send(
-          "🎬 キャッシュがないため、その場で変換中..."
-      )
-
-      def load_and_cache_frames():
-        loaded = []
-        for path in self.frame_files:
-          res = runner(path)
-          if res:
-            loaded.append(res)
-        try:
-          with open(CACHE_FILE, "wb") as f:
-            pickle.dump(loaded, f)
-        except Exception as e:
-          print(f"キャッシュの保存に失敗しました: {e}")
-        return loaded
-
-      self.frames = await asyncio.to_thread(load_and_cache_frames)
-      await status_msg.edit(content=f"✨ 変換完了！全 {len(self.frames)} フレームの再生を開始します。")
-
-    if not self.frames:
-      await ctx.send("フレームの読み込みに失敗しました。")
       return
 
     play_msg = await ctx.send(self.frames[0])
