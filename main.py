@@ -10,7 +10,7 @@ from flask import Flask
 # 環境変数の読み込み
 load_dotenv()
 
-# Webサーバーの設定 (Renderなどの24時間稼働対策)[span_5](start_span)[span_5](end_span)
+# Webサーバーの設定 (Renderなどの24時間稼働対策)
 app = Flask(__name__)
 
 
@@ -24,7 +24,7 @@ def run_web():
   app.run(host="0.0.0.0", port=port)
 
 
-# PostgreSQLのデータベース初期化[span_6](start_span)[span_6](end_span)
+# PostgreSQLのデータベース初期化
 async def init_database(pool):
   async with pool.acquire() as connection:
     await connection.execute("""
@@ -38,35 +38,33 @@ async def init_database(pool):
         """)
 
 
-# インテントの設定[span_7](start_span)[span_7](end_span)
+# インテントの設定（修正箇所）
 intents = discord.Intents.default()
 intents.guilds = True
 intents.guild_messages = True
 intents.message_content = True
-intents.guild_members = True
-intents.guild_voice_states = True
+intents.members = True  # 👈 guild_members から変更
+intents.voice_states = True  # 👈 guild_voice_states から変更
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
 @bot.event
 async def on_ready():
-  print(f"ログインしました: {bot.user}[span_8](start_span)[span_8](end_span)")
+  print(f"ログインしました: {bot.user}")
 
 
 async def main():
-  # Webサーバーを別スレッドでバックグラウンド起動[span_9](start_span)[span_9](end_span)
+  # Webサーバーを別スレッドでバックグラウンド起動
   threading.Thread(target=run_web, daemon=True).start()
 
-  # PostgreSQLのプールを作成し、データベースを初期化[span_10](start_span)[span_10](end_span)
+  # PostgreSQLのプールを作成し、データベースを初期化
   database_url = os.environ.get("DATABASE_URL")
   pool = await asyncpg.create_pool(database_url)
   await init_database(pool)
 
   # ボットからデータベースプールを参照できるようにする
   bot.pool = pool
-
-  # TODO: commands フォルダや cogs の読み込みをここに記述します[span_11](start_span)[span_11](end_span)
 
   # ボットの起動
   token = os.environ.get("DISCORD_TOKEN")
