@@ -1,125 +1,77 @@
+import asyncio
 import os
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import discord
-from discord.ext import commands
 import asyncpg
+from discord.ext import commands
+import discord
 from dotenv import load_dotenv
+from flask import Flask
 
-# ローカル環境用
+# 環境変数の読み込み
 load_dotenv()
 
-# --- 1. Renderのポート要件を満たすための簡易Webサーバー ---
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is running!")
-    
-    def log_message(self, format, *args):
-        pass
-
-def run_web_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
-    server.serve_forever()
-
-# 別スレッドでWebサーバーを常時起動
-threading.Thread(target=run_web_server, daemon=True).start()
+# Webサーバーの設定 (Renderなどの24時間稼働対策)[span_5](start_span)[span_5](end_span)
+app = Flask(__name__)
 
 
-# --- 2. データベース（PostgreSQL）の初期化処理 ---
+@app.route("/")
+def home():
+  return "Botは24時間稼働中です！"
+
+
+def run_web():
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
+
+
+# PostgreSQLのデータベース初期化[span_6](start_span)[span_6](end_span)
 async def init_database(pool):
-    async with pool.acquire() as connection:
-        await connection.execute("""
-            CREATE TABLE IF NOT EXISTS message_counts (
-                user_id TEXT, 
-                guild_id TEXT, 
-                count INTEGER DEFAULT 0, 
-                PRIMARY KEY (user_id, guild_id)
-            );
-            CREATE TABLE IF NOT EXISTS omikuji_cooldowns (
-                user_id TEXT, 
-                guild_id TEXT, 
-                last_date TEXT, 
-                PRIMARY KEY (user_id, guild_id)
-            );
-            CREATE TABLE IF NOT EXISTS guild_settings (
-                guild_id TEXT PRIMARY KEY, 
-                level_channel_id TEXT
-            );
-            CREATE TABLE IF NOT EXISTS sticky_messages (
-                channel_id VARCHAR(32) PRIMARY KEY, 
-                message_id VARCHAR(32), 
-                title TEXT, 
-                description TEXT
-            );
-            CREATE TABLE IF NOT EXISTS scheduled_messages (
-                id SERIAL PRIMARY KEY, 
-                guild_id TEXT, 
-                channel_id TEXT, 
-                author_id TEXT, 
-                message_content TEXT, 
-                send_at TIMESTAMP
-            );
-            CREATE TABLE IF NOT EXISTS intro_channel_settings (
-                id SERIAL PRIMARY KEY, 
-                guild_id TEXT, 
-                source_channel_id TEXT, 
-                keyword TEXT DEFAULT '名前：'
-            );
-            CREATE TABLE IF NOT EXISTS antiraid_settings (
-                guild_id TEXT PRIMARY KEY, 
-                enabled BOOLEAN DEFAULT FALSE
-            );
+  async with pool.acquire() as connection:
+    await connection.execute("""
+            CREATE TABLE IF NOT EXISTS message_counts (user_id TEXT, guild_id TEXT, count INTEGER DEFAULT 0, PRIMARY KEY (user_id, guild_id));
+            CREATE TABLE IF NOT EXISTS omikuji_cooldowns (user_id TEXT, guild_id TEXT, last_date TEXT, PRIMARY KEY (user_id, guild_id));
+            CREATE TABLE IF NOT EXISTS guild_settings (guild_id TEXT PRIMARY KEY, level_channel_id TEXT);
+            CREATE TABLE IF NOT EXISTS sticky_messages (channel_id VARCHAR(32) PRIMARY KEY, message_id VARCHAR(32), title TEXT, description TEXT);
+            CREATE TABLE IF NOT EXISTS scheduled_messages (id SERIAL PRIMARY KEY, guild_id TEXT, channel_id TEXT, author_id TEXT, message_content TEXT, send_at TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS intro_channel_settings (id SERIAL PRIMARY KEY, guild_id TEXT, source_channel_id TEXT, keyword TEXT DEFAULT '名前：');
+            CREATE TABLE IF NOT EXISTS antiraid_settings (guild_id TEXT PRIMARY KEY, enabled BOOLEAN DEFAULT FALSE);
         """)
-    print("🗄️ データベースのテーブルを確認・初期化しました。")
 
 
-# --- 3. Discordボットのメインクラス ---
-class MyBot(commands.Bot):
-    def __init__(self):
-        # discord.py v2以降の正しいインテント設定
-        intents = discord.Intents.default()
-        intents.guilds = True
-        intents.messages = True          # guild_messages ではなく messages
-        intents.message_content = True
-        intents.members = True           # guild_members ではなく members に修正
-        intents.voice_states = True      # guild_voice_states ではなく voice_states
+# インテントの設定[span_7](start_span)[span_7](end_span)
+intents = discord.Intents.default()
+intents.guilds = True
+intents.guild_messages = True
+intents.message_content = True
+intents.guild_members = True
+intents.guild_voice_states = True
 
-        super().__init__(command_prefix="!", intents=intents)
-        self.pool = None
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-    async def setup_hook(self):
-        # PostgreSQL接続プールを作成 (Renderの DATABASE_URL を使用)
-        database_url = os.getenv("DATABASE_URL")
-        if database_url:
-            self.pool = await asyncpg.create_pool(dsn=database_url, ssl="require")
-            await init_database(self.pool)
-        else:
-            print("⚠️ 警告: DATABASE_URL が設定されていません。")
 
-        # cogsフォルダ内の拡張機能を自動読み込み
-        if os.path.exists("./cogs"):
-            for filename in os.listdir("./cogs"):
-                if filename.endswith(".py"):
-                    extension_name = f"cogs.{filename[:-3]}"
-                    await self.load_extension(extension_name)
-                    print(f"📁 Cog読み込み完了: {filename}")
+@bot.event
+async def on_ready():
+  print(f"ログインしました: {bot.user}[span_8](start_span)[span_8](end_span)")
 
-        # スラッシュコマンドの同期
-        await self.tree.sync()
-        print("🌐 スラッシュコマンドを同期しました。")
 
-    async def on_ready(self):
-        print(f"Logged in as {self.user} (ID: {self.user.id})")
-        print("------")
+async def main():
+  # Webサーバーを別スレッドでバックグラウンド起動[span_9](start_span)[span_9](end_span)
+  threading.Thread(target=run_web, daemon=True).start()
 
-bot = MyBot()
+  # PostgreSQLのプールを作成し、データベースを初期化[span_10](start_span)[span_10](end_span)
+  database_url = os.environ.get("DATABASE_URL")
+  pool = await asyncpg.create_pool(database_url)
+  await init_database(pool)
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+  # ボットからデータベースプールを参照できるようにする
+  bot.pool = pool
 
-if not TOKEN:
-    print("❌ エラー: DISCORD_TOKEN が環境変数に設定されていません。")
-else:
-    bot.run(TOKEN)
+  # TODO: commands フォルダや cogs の読み込みをここに記述します[span_11](start_span)[span_11](end_span)
+
+  # ボットの起動
+  token = os.environ.get("DISCORD_TOKEN")
+  await bot.start(token)
+
+
+if __name__ == "__main__":
+  asyncio.run(main())
