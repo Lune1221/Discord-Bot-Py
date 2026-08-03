@@ -2,3 +2,5 @@ discord.py
 flask
 asyncpg
 python-dotenv
+Pillow
+opencv-python
