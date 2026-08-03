@@ -30,7 +30,8 @@ class Schedule(commands.Cog):
       message: str,
       time: str,
   ):
-    await interaction.response.defer()
+    # 🟢 応答を自分だけに隠す設定（ephemeral=True）を追加
+    await interaction.response.defer(ephemeral=True)
     guild_id = str(interaction.guild_id)
 
     normalized_time_str = time.replace(" ", "T") + "+09:00"
@@ -39,7 +40,8 @@ class Schedule(commands.Cog):
     except ValueError:
       await interaction.followup.send(
           "❌ 日時の形式が正しくありません。「`YYYY-MM-DD HH:MM`」の形式で入力してください（例:"
-          " `2026-07-30 15:00`）。"
+          " `2026-07-30 15:00`）。",
+          ephemeral=True,
       )
       return
 
@@ -48,16 +50,16 @@ class Schedule(commands.Cog):
 
     if target_date <= now:
       await interaction.followup.send(
-          "❌ 過去の日時は指定できません。未来の時間を設定してください。"
+          "❌ 過去の日時は指定できません。未来の時間を設定してください。",
+          ephemeral=True,
       )
       return
     if target_date > one_year_later:
       await interaction.followup.send(
-          "❌ 予約できるのは現在から1年以内までです。"
+          "❌ 予約できるのは現在から1年以内までです。", ephemeral=True
       )
       return
 
-    # 🟢 データベース保存用に日本時間のままタイムゾーン情報を外した日時に変換
     target_date_jst = target_date.astimezone(ZoneInfo("Asia/Tokyo")).replace(
         tzinfo=None
     )
@@ -75,7 +77,8 @@ class Schedule(commands.Cog):
 
     formatted_time = target_date.strftime("%Y/%m/%d %H:%M:%S")
     await interaction.followup.send(
-        f"✨ {channel.mention} へのメッセージ送信を **{formattedTime}** に予約しました！"
+        f"✨ {channel.mention} へのメッセージ送信を **{formattedTime}** に予約しました！",
+        ephemeral=True,
     )
 
   @schedule_group.command(
@@ -83,7 +86,8 @@ class Schedule(commands.Cog):
   )
   @app_commands.checks.has_permissions(manage_messages=True)
   async def schedule_list(self, interaction: discord.Interaction):
-    await interaction.response.defer()
+    # 🟢 応答を自分だけに隠す設定（ephemeral=True）を追加
+    await interaction.response.defer(ephemeral=True)
     guild_id = str(interaction.guild_id)
     pool = self.bot.pool
 
@@ -95,13 +99,13 @@ class Schedule(commands.Cog):
 
     if not res:
       await interaction.followup.send(
-          "📭 このサーバーに登録されている予約メッセージはありません。"
+          "📭 このサーバーに登録されている予約メッセージはありません。",
+          ephemeral=True,
       )
       return
 
     list_text = "📋 **現在の予約メッセージ一覧**\n"
     for row in res:
-      # 🟢 取得した日時に日本時間のタイムゾーンを付与して正しく表示
       dt = row["send_at"]
       if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("Asia/Tokyo"))
@@ -114,7 +118,7 @@ class Schedule(commands.Cog):
           f" {date_str}\n  内容: `{preview}`\n"
       )
 
-    await interaction.followup.send(list_text)
+    await interaction.followup.send(list_text, ephemeral=True)
 
   @schedule_group.command(
       name="cancel", description="IDを指定して予約をキャンセルします"
@@ -122,7 +126,8 @@ class Schedule(commands.Cog):
   @app_commands.describe(id="キャンセルする予約のID (listコマンドで確認できます)")
   @app_commands.checks.has_permissions(manage_messages=True)
   async def schedule_cancel(self, interaction: discord.Interaction, id: int):
-    await interaction.response.defer()
+    # 🟢 応答を自分だけに隠す設定（ephemeral=True）を追加
+    await interaction.response.defer(ephemeral=True)
     guild_id = str(interaction.guild_id)
     pool = self.bot.pool
 
@@ -135,11 +140,14 @@ class Schedule(commands.Cog):
 
     if not res:
       await interaction.followup.send(
-          f"❌ ID `{id}` の予約が見つからないか、このサーバーの予約ではありません。"
+          f"❌ ID `{id}` の予約が見つからないか、このサーバーの予約ではありません。",
+          ephemeral=True,
       )
       return
 
-    await interaction.followup.send(f"🗑️ ID `{id}` の予約をキャンセルしました。")
+    await interaction.followup.send(
+        f"🗑️ ID `{id}` の予約をキャンセルしました。", ephemeral=True
+    )
 
 
 async def setup(bot):
