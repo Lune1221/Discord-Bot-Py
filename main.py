@@ -5,7 +5,7 @@ import asyncpg
 from discord.ext import commands
 import discord
 from dotenv import load_dotenv
-from flask import Flask
+from Flask import Flask
 
 # 環境変数の読み込み
 load_dotenv()
@@ -52,6 +52,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
   print(f"ログインしました: {bot.user}")
+  # 🟢 ログインが完了した安全なタイミングで、指定サーバーへ即時同期する
+  try:
+    TEST_GUILD_ID = discord.Object(id=1464160132765319305)
+    bot.tree.copy_global_to(guild=TEST_GUILD_ID)
+    await bot.tree.sync(guild=TEST_GUILD_ID)
+    print("指定サーバーへのコマンド同期が完了しました！")
+  except Exception as e:
+    print(f"同期に失敗しました: {e}")
 
 
 async def main():
@@ -74,18 +82,9 @@ async def main():
         await bot.load_extension(cog_name)
         print(f"読み込みました: {cog_name}")
 
-  async with bot:
-    # 🟢 ご提示いただいたサーバーID（1464160132765319305）に即時同期します
-    TEST_GUILD_ID = discord.Object(id=1464160132765319305)
-
-    print("指定サーバーへコマンドを即時同期中...")
-    bot.tree.copy_global_to(guild=TEST_GUILD_ID)
-    await bot.tree.sync(guild=TEST_GUILD_ID)
-    print("同期が完了しました！")
-
-    # ボットの起動
-    token = os.environ.get("DISCORD_TOKEN")
-    await bot.start(token)
+  # ボットの起動
+  token = os.environ.get("DISCORD_TOKEN")
+  await bot.start(token)
 
 
 if __name__ == "__main__":
