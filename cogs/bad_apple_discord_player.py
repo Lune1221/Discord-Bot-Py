@@ -1,6 +1,7 @@
 import asyncio
 import glob
 import os
+import pickle
 import time
 from discord.ext import commands
 from PIL import Image
@@ -11,6 +12,7 @@ ASCII_CHARS = ASCII_CHARS[::-1]
 
 WIDTH = 60
 TIMEOUT = 0.13
+CACHE_FILE = "bad_apple_cache.pkl"
 
 
 def resize(image, new_width=WIDTH):
@@ -66,6 +68,17 @@ class BadApple(commands.Cog):
         f"Bad Apple: {len(self.frame_files)}枚のフレームファイルを確認しました。"
     )
 
+    # 起動時にキャッシュファイルがあれば自動で読み込む
+    if os.path.exists(CACHE_FILE):
+      try:
+        with open(CACHE_FILE, "rb") as f:
+          self.frames = pickle.load(f)
+        print(
+            f"Bad Apple: キャッシュから {len(self.frames)} フレームを読み込みました！"
+        )
+      except Exception as e:
+        print(f"Bad Apple: キャッシュの読み込みに失敗しました: {e}")
+
   @commands.command(name="bad_apple", aliases=["badapple"])
   async def bad_apple(self, ctx):
     if not self.frame_files:
@@ -74,23 +87,29 @@ class BadApple(commands.Cog):
       )
       return
 
+    # キャッシュがない場合のみ変換して保存
     if not self.frames:
       status_msg = await ctx.send(
-          "🎬 Bad Appleのフレームを読み込んでいます（初回のみ）..."
+          "🎬 初回変換中（次回からは一瞬です）..."
       )
 
-      def load_all_frames():
+      def load_and_cache_frames():
         loaded = []
         for path in self.frame_files:
           res = runner(path)
           if res:
             loaded.append(res)
+        try:
+          with open(CACHE_FILE, "wb") as f:
+            pickle.dump(loaded, f)
+        except Exception as e:
+          print(f"キャッシュの保存に失敗しました: {e}")
         return loaded
 
-      self.frames = await asyncio.to_thread(load_all_frames)
+      self.frames = await asyncio.to_thread(load_and_cache_frames)
       await status_msg.edit(
           content=(
-              f"✨ 読み込み完了！全 {len(self.frames)}"
+              f"✨ 変換＆保存完了！全 {len(self.frames)}"
               " フレームの再生を開始します。"
           )
       )
