@@ -54,7 +54,7 @@ async def on_ready():
   print(f"ログインしました: {bot.user}")
   try:
     TEST_GUILD_ID = discord.Object(id=1464160132765319305)
-    bot.tree.copy_global_to(guild=TEST_GUILD_ID)
+    # 🟢 重複を防ぐため copy_global_to を削除し、サーバー専用の同期だけに絞ります
     await bot.tree.sync(guild=TEST_GUILD_ID)
     print("指定サーバーへのコマンド同期が完了しました！")
   except Exception as e:
