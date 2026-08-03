@@ -1,3 +1,4 @@
+import asyncio
 import glob
 import os
 import time
@@ -55,29 +56,55 @@ class BadApple(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
     self.frames = []
-    print("Bad Appleのフレームを読み込んでいます...")
-
-    frame_files = sorted(
+    # 起動時はファイルパスのリストだけを保持（重い処理をしない）
+    self.frame_files = sorted(
         glob.glob("frames/frame*.jpg"),
         key=lambda x: int(
             os.path.basename(x).replace("frame", "").replace(".jpg", "")
         ),
     )
-
-    for path in frame_files:
-      self.frames.append(runner(path))
-
     print(
-        f"Bad Appleのフレーム読み込みが完了しました！合計 {len(self.frames)}"
-        " フレーム"
+        f"Bad Apple: {len(self.frame_files)}枚のフレームファイルを確認しました。"
     )
 
-  # スペースなしのエイリアスに変更
   @commands.command(name="bad_apple", aliases=["badapple"])
   async def bad_apple(self, ctx):
-    if not self.frames:
-      await ctx.send("フレームが読み込まれていません。")
+    if not self.frame_files:
+      await ctx.send(
+          "フレームファイルが見つかりません（frames/ フォルダを確認してください）。"
+      )
       return
+
+    # 初回実行時のみ、フリーズしないよう非同期でフレームを読み込む
+    if not self.frames:
+      status_msg = await ctx.send(
+          "🎬 Bad Appleのフレームを読み込んでいます（初回のみ）..."
+      )
+
+      def load_all_frames():
+        loaded = []
+        for path in self.frame_files:
+          res = runner(path)
+          if res:
+            loaded.append(res)
+        return loaded
+
+      # バックグラウンドスレッドで重い読み込みを実行
+      self.frames = await asyncio.to_thread(load_all_frames)
+      await status_msg.edit(
+          content=(
+              f"✨ 読み込み完了！全 {len(self.frames)}"
+              " フレームの再生を開始します。"
+          )
+      )
+
+    # 再生処理（メッセージを編集してアニメーションさせる）
+    if not self.frames:
+      await ctx.send("フレームの読み込みに失敗しました。")
+      return
+
+    # 最初のフレームを送信
+    play_msg = await ctx.send(self.frames[0])
 
     oldTimestamp = time.time()
     i = 0
@@ -88,7 +115,10 @@ class BadApple(commands.Cog):
         if (newTimestamp - oldTimestamp) >= TIMEOUT:
           frame_content = self.frames[int(i)]
           if frame_content:
-            await ctx.send(frame_content)
+            try:
+              await play_msg.edit(content=frame_content)
+            except Exception:
+              break  -
           newTimestamp = time.time()
           i += (newTimestamp - oldTimestamp) / TIMEOUT
           oldTimestamp = newTimestamp
