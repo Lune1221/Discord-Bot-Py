@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from flask import Flask
 
-# Flask（Werkzeug）の開発サーバー警告とアクセスログを非表示にする
+# Flaskの開発サーバー警告とアクセスログを非表示にする
 log = logging.getLogger("werkzeug")
 log.setLevel(logging.ERROR)
 
@@ -25,7 +25,7 @@ def run_flask():
 
 # --- 2. Discordボットの準備 ---
 intents = discord.Intents.default()
-intents.message_content = True  # メッセージの内容読み取りに必須
+intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -36,12 +36,29 @@ async def on_ready():
       f"=== ログイン成功: {bot.user.name} (ID: {bot.user.id}) ===", flush=True
   )
 
-  # 明示的に bad_apple_discord_player を読み込む
+  # 1. バッドアップル用のコグを読み込み
   try:
     await bot.load_extension("cogs.bad_apple_discord_player")
     print("読み込み成功: cogs.bad_apple_discord_player", flush=True)
   except Exception as e:
-    print(f"【読み込み失敗】エラー詳細: {e}", flush=True)
+    print(f"【読み込み失敗】Bad Apple: {e}", flush=True)
+
+  # 2. 画像をAAにするコグを読み込み（※ファイル名を image_to_aa.py にした場合）
+  try:
+    await bot.load_extension("cogs.image_to_aa")
+    print("読み込み成功: cogs.image_to_aa", flush=True)
+  except Exception as e:
+    print(f"【読み込み失敗】Image to AA: {e}", flush=True)
+
+  # 3. 【最重要】スラッシュコマンドをDiscordに同期する
+  try:
+    synced = await bot.tree.sync()
+    print(
+        f"🌟 スラッシュコマンドの同期に成功しました（合計 {len(synced)} 個）",
+        flush=True,
+    )
+  except Exception as e:
+    print(f"【同期失敗】エラー詳細: {e}", flush=True)
 
 
 # --- 3. メイン起動処理 ---
