@@ -49,7 +49,7 @@ async def main():
   flask_thread.start()
 
   # ボットのトークンを取得して起動
-  token = os.environ.get("DISCORD_BOT_TOKEN")
+  token = os.environ.get("DISCORD_TOKEN")
   if not token:
     print("エラー: DISCORD_BOT_TOKEN が環境変数に設定されていません。")
     return
