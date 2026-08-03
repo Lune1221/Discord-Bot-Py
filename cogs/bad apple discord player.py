@@ -57,7 +57,6 @@ class BadApple(commands.Cog):
     self.frames = []
     print("Bad Appleのフレームを読み込んでいます...")
 
-    # パスを除いたファイル名だけでソートするように修正
     frame_files = sorted(
         glob.glob("frames/frame*.jpg"),
         key=lambda x: int(
@@ -73,7 +72,8 @@ class BadApple(commands.Cog):
         " フレーム"
     )
 
-  @commands.command(name="bad_apple", aliases=["bad apple"])
+  # スペースなしのエイリアスに変更
+  @commands.command(name="bad_apple", aliases=["badapple"])
   async def bad_apple(self, ctx):
     if not self.frames:
       await ctx.send("フレームが読み込まれていません。")
