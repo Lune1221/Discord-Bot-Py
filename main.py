@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from flask import Flask
 
-# --- 1. Flaskサーバーの準備 ---
+# --- 1. Flaskサーバーの準備 (Web稼働用) ---
 app = Flask(__name__)
 
 
@@ -21,7 +21,7 @@ def run_flask():
 
 # --- 2. Discordボットの準備 ---
 intents = discord.Intents.default()
-intents.message_content = True
+intents.message_content = True  # メッセージの内容読み取りに必須
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -30,6 +30,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
   print(f"ログインしました: {bot.user.name} (ID: {bot.user.id})")
 
+  # cogsフォルダ内のファイルを自動読み込み
   for filename in os.listdir("./cogs"):
     if filename.endswith(".py"):
       cog_name = f"cogs.{filename[:-3]}"
@@ -42,6 +43,7 @@ async def on_ready():
 
 # --- 3. 同時起動のメイン処理 ---
 async def main():
+  # Flaskを別スレッドでバックグラウンド起動
   flask_thread = threading.Thread(target=run_flask)
   flask_thread.daemon = True
   flask_thread.start()
