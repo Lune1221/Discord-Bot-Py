@@ -76,9 +76,11 @@ class Schedule(commands.Cog):
           target_date_jst,
       )
 
+      # 🟢 変数名を `formatted_time` に統一しました
       formatted_time = target_date.strftime("%Y/%m/%d %H:%M:%S")
       await interaction.followup.send(
-          f"✨ {channel.mention} へのメッセージ送信を **{formattedTime}** に予約しました！",
+          f"✨ {channel.mention} へのメッセージ送信を **{formatted_time}**"
+          " に予約しました！",
           ephemeral=True,
       )
     except Exception as e:
