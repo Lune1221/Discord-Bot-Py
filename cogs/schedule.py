@@ -57,6 +57,11 @@ class Schedule(commands.Cog):
       )
       return
 
+    # 🟢 データベース保存用に日本時間のままタイムゾーン情報を外した日時に変換
+    target_date_jst = target_date.astimezone(ZoneInfo("Asia/Tokyo")).replace(
+        tzinfo=None
+    )
+
     pool = self.bot.pool
     await pool.execute(
         "INSERT INTO scheduled_messages (guild_id, channel_id, author_id,"
@@ -65,7 +70,7 @@ class Schedule(commands.Cog):
         str(channel.id),
         str(interaction.user.id),
         message,
-        target_date,
+        target_date_jst,
     )
 
     formatted_time = target_date.strftime("%Y/%m/%d %H:%M:%S")
@@ -96,7 +101,12 @@ class Schedule(commands.Cog):
 
     list_text = "📋 **現在の予約メッセージ一覧**\n"
     for row in res:
-      date_str = row["send_at"].strftime("%Y/%m/%d %H:%M:%S")
+      # 🟢 取得した日時に日本時間のタイムゾーンを付与して正しく表示
+      dt = row["send_at"]
+      if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("Asia/Tokyo"))
+      date_str = dt.strftime("%Y/%m/%d %H:%M:%S")
+
       content = row["message_content"]
       preview = content[:20] + "..." if len(content) > 20 else content
       list_text += (
