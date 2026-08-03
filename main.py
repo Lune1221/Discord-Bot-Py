@@ -5,7 +5,7 @@ import asyncpg
 from discord.ext import commands
 import discord
 from dotenv import load_dotenv
-from flask import Flask  # 👈 小文字の flask に修正しました
+from flask import Flask
 
 # 環境変数の読み込み
 load_dotenv()
