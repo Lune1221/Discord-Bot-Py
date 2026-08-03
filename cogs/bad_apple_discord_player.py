@@ -107,12 +107,8 @@ class BadApple(commands.Cog):
         return loaded
 
       self.frames = await asyncio.to_thread(load_and_cache_frames)
-      await status_msg.edit(
-          content=(
-              f"✨ 変換＆保存完了！全 {len(self.frames)}"
-              " フレームの再生を開始します。"
-          )
-      )
+      # 完了メッセージに書き換える代わりにメッセージを削除する
+      await status_msg.delete()
 
     if not self.frames:
       await ctx.send("フレームの読み込みに失敗しました。")
