@@ -9,8 +9,7 @@ ASCII_CHARS.reverse()
 ASCII_CHARS = ASCII_CHARS[::-1]
 
 WIDTH = 60
-# 実際のフレーム数から自動計算するように変更、または適切な遅延に調整
-TIMEOUT = 0.13  # テンポに応じて調整してください
+TIMEOUT = 0.13
 
 
 def resize(image, new_width=WIDTH):
@@ -58,10 +57,12 @@ class BadApple(commands.Cog):
     self.frames = []
     print("Bad Appleのフレームを読み込んでいます...")
 
-    # framesフォルダ内の画像ファイルを番号順に自動取得
+    # パスを除いたファイル名だけでソートするように修正
     frame_files = sorted(
         glob.glob("frames/frame*.jpg"),
-        key=lambda x: int(x.split("frame")[1].split(".")[0]),
+        key=lambda x: int(
+            os.path.basename(x).replace("frame", "").replace(".jpg", "")
+        ),
     )
 
     for path in frame_files:
