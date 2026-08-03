@@ -1,8 +1,8 @@
 import time
 from discord.ext import commands
 
-WIDTH = 60
-TIMEOUT = 0.13
+# 3分39秒 = 219.0秒（本家の正確な長さ）
+TOTAL_DURATION = 219.0
 
 
 class BadApple(commands.Cog):
@@ -11,12 +11,11 @@ class BadApple(commands.Cog):
     self.bot = bot
     self.frames = []
 
-    # Pythonファイルから一瞬で読み込む
     try:
       from frames_data import FRAMES
 
       self.frames = FRAMES
-      print(f"Bad Apple: プリセットから {len(self.frames)} フレームを読み込みました！")
+      print(f"Bad Apple: {len(self.frames)} フレームを読み込みました！")
     except Exception as e:
       print(f"Bad Apple: フレームデータの読み込みに失敗しました: {e}")
 
@@ -29,24 +28,30 @@ class BadApple(commands.Cog):
       return
 
     play_msg = await ctx.send(self.frames[0])
+    total_frames = len(self.frames)
+    start_time = time.time()
 
-    oldTimestamp = time.time()
-    i = 0
-    while i < len(self.frames) - 1:
-      disp = False
-      while not disp:
-        newTimestamp = time.time()
-        if (newTimestamp - oldTimestamp) >= TIMEOUT:
-          frame_content = self.frames[int(i)]
-          if frame_content:
-            try:
-              await play_msg.edit(content=frame_content)
-            except Exception:
-              break
-          newTimestamp = time.time()
-          i += (newTimestamp - oldTimestamp) / TIMEOUT
-          oldTimestamp = newTimestamp
-          disp = True
+    last_index = 0
+    while True:
+      elapsed = time.time() - start_time
+      if elapsed >= TOTAL_DURATION:
+        break
+
+      # 【超重要】いま何秒経過したかから「何番目のフレームを表示すべきか」を自動計算する
+      # これにより、フレーム数が何枚であっても必ず「219秒」のなかに綺麗に収まります
+      current_index = int((elapsed / TOTAL_DURATION) * total_frames)
+      if current_index >= total_frames:
+        current_index = total_frames - 1
+
+      if current_index != last_index:
+        last_index = current_index
+        try:
+          await play_msg.edit(content=self.frames[current_index])
+        except Exception:
+          break
+
+      # Discordの過負荷を防ぐための短い待機
+      time.sleep(0.03)
 
 
 async def setup(bot):
