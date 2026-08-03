@@ -1,4 +1,5 @@
 import asyncio
+import time
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -8,7 +9,8 @@ class Sticky(commands.Cog):
 
   def __init__(self, bot):
     self.bot = bot
-    self.locks = {}  # チャンネルごとの同時実行を防ぐロック
+    self.locks = {}
+    self.last_triggered = {}  # 連続発火を防ぐためのタイムスタンプ記録
 
   def get_lock(self, channel_id):
     if channel_id not in self.locks:
@@ -33,7 +35,6 @@ class Sticky(commands.Cog):
 
     lock = self.get_lock(channel_id)
     async with lock:
-      # 既に設定されている古いメッセージがあれば削除
       row = await pool.fetchrow(
           "SELECT message_id FROM sticky_messages WHERE channel_id = $1",
           channel_id,
@@ -47,13 +48,11 @@ class Sticky(commands.Cog):
         except Exception:
           pass
 
-      # 新しい固定メッセージを送信
       embed = discord.Embed(
           title=title, description=description, color=discord.Color.blue()
       )
       sent_msg = await interaction.channel.send(embed=embed)
 
-      # データベースに保存
       await pool.execute(
           """
                 INSERT INTO sticky_messages (channel_id, message_id, title, description)
@@ -109,10 +108,19 @@ class Sticky(commands.Cog):
       return
 
     channel_id = str(message.channel.id)
-    pool = self.bot.pool
 
-    # チャンネルごとにロックをかけて同時に処理されないようにする
+    # 🟢 連続発火ガード: 1.5秒以内に同じチャンネルで処理が走っていたら無視する
+    current_time = time.time()
+    if (
+        channel_id in self.last_triggered
+        and current_time - self.last_triggered[channel_id] < 1.5
+    ):
+      return
+    self.last_triggered[channel_id] = current_time
+
+    pool = self.bot.pool
     lock = self.get_lock(channel_id)
+
     async with lock:
       row = await pool.fetchrow(
           "SELECT message_id, title, description FROM sticky_messages WHERE"
@@ -122,7 +130,6 @@ class Sticky(commands.Cog):
       if not row:
         return
 
-      # 古い固定メッセージを削除
       old_message_id = row["message_id"]
       if old_message_id:
         try:
@@ -131,7 +138,6 @@ class Sticky(commands.Cog):
         except Exception:
           pass
 
-      # 新しい固定メッセージを送信
       embed = discord.Embed(
           title=row["title"],
           description=row["description"],
@@ -139,7 +145,6 @@ class Sticky(commands.Cog):
       )
       new_msg = await message.channel.send(embed=embed)
 
-      # データベースのメッセージIDを更新
       await pool.execute(
           "UPDATE sticky_messages SET message_id = $1 WHERE channel_id = $2",
           str(new_msg.id),
