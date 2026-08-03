@@ -56,7 +56,6 @@ class BadApple(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
     self.frames = []
-    # 起動時はファイルパスのリストだけを保持（重い処理をしない）
     self.frame_files = sorted(
         glob.glob("frames/frame*.jpg"),
         key=lambda x: int(
@@ -75,7 +74,6 @@ class BadApple(commands.Cog):
       )
       return
 
-    # 初回実行時のみ、フリーズしないよう非同期でフレームを読み込む
     if not self.frames:
       status_msg = await ctx.send(
           "🎬 Bad Appleのフレームを読み込んでいます（初回のみ）..."
@@ -89,7 +87,6 @@ class BadApple(commands.Cog):
             loaded.append(res)
         return loaded
 
-      # バックグラウンドスレッドで重い読み込みを実行
       self.frames = await asyncio.to_thread(load_all_frames)
       await status_msg.edit(
           content=(
@@ -98,12 +95,10 @@ class BadApple(commands.Cog):
           )
       )
 
-    # 再生処理（メッセージを編集してアニメーションさせる）
     if not self.frames:
       await ctx.send("フレームの読み込みに失敗しました。")
       return
 
-    # 最初のフレームを送信
     play_msg = await ctx.send(self.frames[0])
 
     oldTimestamp = time.time()
@@ -118,7 +113,7 @@ class BadApple(commands.Cog):
             try:
               await play_msg.edit(content=frame_content)
             except Exception:
-              break  -
+              break
           newTimestamp = time.time()
           i += (newTimestamp - oldTimestamp) / TIMEOUT
           oldTimestamp = newTimestamp
