@@ -24,14 +24,13 @@ def run_web():
   app.run(host="0.0.0.0", port=port)
 
 
-# PostgreSQLのデータベース初期化
+# PostgreSQLのデータベース初期化（sticky_messagesを削除済み）
 async def init_database(pool):
   async with pool.acquire() as connection:
     await connection.execute("""
             CREATE TABLE IF NOT EXISTS message_counts (user_id TEXT, guild_id TEXT, count INTEGER DEFAULT 0, PRIMARY KEY (user_id, guild_id));
             CREATE TABLE IF NOT EXISTS omikuji_cooldowns (user_id TEXT, guild_id TEXT, last_date TEXT, PRIMARY KEY (user_id, guild_id));
             CREATE TABLE IF NOT EXISTS guild_settings (guild_id TEXT PRIMARY KEY, level_channel_id TEXT);
-            CREATE TABLE IF NOT EXISTS sticky_messages (channel_id VARCHAR(32) PRIMARY KEY, message_id VARCHAR(32), title TEXT, description TEXT);
             CREATE TABLE IF NOT EXISTS scheduled_messages (id SERIAL PRIMARY KEY, guild_id TEXT, channel_id TEXT, author_id TEXT, message_content TEXT, send_at TIMESTAMP);
             CREATE TABLE IF NOT EXISTS intro_channel_settings (id SERIAL PRIMARY KEY, guild_id TEXT, source_channel_id TEXT, keyword TEXT DEFAULT '名前：');
             CREATE TABLE IF NOT EXISTS antiraid_settings (guild_id TEXT PRIMARY KEY, enabled BOOLEAN DEFAULT FALSE);
@@ -55,7 +54,7 @@ class MyBot(commands.Bot):
     self.pool = await asyncpg.create_pool(database_url)
     await init_database(self.pool)
 
-    # cogs フォルダ内のファイルをすべて自動読み込み
+    # cogs フォルダ内のファイルをすべて自動読み込み（sticky.pyファイル本体を削除していれば読み込まれません）
     if os.path.exists("./cogs"):
       for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
@@ -84,7 +83,7 @@ async def main():
   # 1. Webサーバー（Flask）を別スレッドでバックグラウンド起動（Render対策）
   threading.Thread(target=run_web, daemon=True).start()
 
-  # 2. ボットの起動（トークンは DISCORD_TOKEN または DISCORD_BOT_TOKEN に対応）
+  # 2. ボットの起動
   token = os.environ.get("DISCORD_TOKEN") or os.environ.get(
       "DISCORD_BOT_TOKEN"
   )
