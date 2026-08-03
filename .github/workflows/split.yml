@@ -1,0 +1,44 @@
+name: Split Video to Frames
+
+on:
+  push:
+    paths:
+      - 'bad_apple.mp4'
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install OpenCV
+        run: pip install opencv-python
+
+      - name: Create frames directory
+        run: mkdir -p frames
+
+      - name: Run splitting script
+        run: |
+          python -c '
+          import cv2
+          vidObj = cv2.VideoCapture("bad_apple.mp4")
+          count = 0
+          success = True
+          while success:
+              success, image = vidObj.read()
+              if success:
+                  cv2.imwrite(f"frames/frame{count*4}.jpg", image)
+              count += 1
+          '
+
+      - name: Commit and push frames
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-generate frames from video"
+          branch: main
