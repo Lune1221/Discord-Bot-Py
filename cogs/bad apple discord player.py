@@ -1,99 +1,98 @@
-import discord
+import glob
+import os
 import time
+from discord.ext import commands
 from PIL import Image
 
-CLIP_FRAMES = 6571
-
-CLIP_LENGTH = 219.0666
-
-ASCII_CHARS = ['⠀','⠄','⠆','⠖','⠶','⡶','⣩','⣪','⣫','⣾','⣿']
+ASCII_CHARS = ["⠀", "⠄", "⠆", "⠖", "⠶", "⡶", "⣩", "⣪", "⣫", "⣾", "⣿"]
 ASCII_CHARS.reverse()
 ASCII_CHARS = ASCII_CHARS[::-1]
 
 WIDTH = 60
+# 実際のフレーム数から自動計算するように変更、または適切な遅延に調整
+TIMEOUT = 0.13  # テンポに応じて調整してください
 
-TIMEOUT = 1/((int(CLIP_FRAMES/4)+1)/CLIP_LENGTH)*18
 
 def resize(image, new_width=WIDTH):
-    (old_width, old_height) = image.size
-    aspect_ratio = float(old_height)/float(old_width)
-    new_height = int((aspect_ratio * new_width)/2)
-    new_dim = (new_width, new_height)
-    new_image = image.resize(new_dim)
-    return new_image
+  old_width, old_height = image.size
+  aspect_ratio = float(old_height) / float(old_width)
+  new_height = int((aspect_ratio * new_width) / 2)
+  return image.resize((new_width, new_height))
+
 
 def grayscalify(image):
-    return image.convert('L')
+  return image.convert("L")
+
 
 def modify(image, buckets=25):
-    initial_pixels = list(image.getdata())
-    new_pixels = [ASCII_CHARS[pixel_value//buckets] for pixel_value in initial_pixels]
-    return ''.join(new_pixels)
+  initial_pixels = list(image.getdata())
+  new_pixels = [
+      ASCII_CHARS[pixel_value // buckets] for pixel_value in initial_pixels
+  ]
+  return "".join(new_pixels)
+
 
 def do(image, new_width=WIDTH):
-    image = resize(image)
-    image = grayscalify(image)
+  image = resize(image)
+  image = grayscalify(image)
+  pixels = modify(image)
+  len_pixels = len(pixels)
+  return "\n".join([
+      pixels[index : index + int(new_width)]
+      for index in range(0, len_pixels, int(new_width))
+  ])
 
-    pixels = modify(image)
-    len_pixels = len(pixels)
-
-    new_image = [pixels[index:index+int(new_width)] for index in range(0, len_pixels, int(new_width))]
-
-    return '\n'.join(new_image)
 
 def runner(path):
-    image = None
-    try:
-        image = Image.open(path)
-    except Exception:
-        print("Unable to find image in",path)
-        return
-    image = do(image)
+  try:
+    image = Image.open(path)
+  except Exception:
+    return None
+  return do(image)
 
-    return image
 
-frames = []
+class BadApple(commands.Cog):
 
-for i in range(0, int(CLIP_FRAMES/4)+1):
-    path = "frames/frame"+str(i*4)+".jpg" #<--- path to folder containing every frame of the video
-    frames.append(runner(path))
+  def __init__(self, bot):
+    self.bot = bot
+    self.frames = []
+    print("Bad Appleのフレームを読み込んでいます...")
 
-intents = discord.Intents.default()
-intents.message_content = True
-client = discord.Client(intents=intents)
+    # framesフォルダ内の画像ファイルを番号順に自動取得
+    frame_files = sorted(
+        glob.glob("frames/frame*.jpg"),
+        key=lambda x: int(x.split("frame")[1].split(".")[0]),
+    )
 
-@client.event
-async def on_ready():
-    print('We have logged in as {0.user}'.format(client))
+    for path in frame_files:
+      self.frames.append(runner(path))
 
-@client.event
-async def on_message(message):
+    print(
+        f"Bad Appleのフレーム読み込みが完了しました！合計 {len(self.frames)}"
+        " フレーム"
+    )
 
-    if message.content.startswith('!bad apple'):
-        
-        oldTimestamp = time.time()
+  @commands.command(name="bad_apple", aliases=["bad apple"])
+  async def bad_apple(self, ctx):
+    if not self.frames:
+      await ctx.send("フレームが読み込まれていません。")
+      return
 
-        start = oldTimestamp
+    oldTimestamp = time.time()
+    i = 0
+    while i < len(self.frames) - 1:
+      disp = False
+      while not disp:
+        newTimestamp = time.time()
+        if (newTimestamp - oldTimestamp) >= TIMEOUT:
+          frame_content = self.frames[int(i)]
+          if frame_content:
+            await ctx.send(frame_content)
+          newTimestamp = time.time()
+          i += (newTimestamp - oldTimestamp) / TIMEOUT
+          oldTimestamp = newTimestamp
+          disp = True
 
-        seconds = 0
-        minutes = 0
 
-        i = 0
-        
-        while i < len(frames)-1:
-            disp = False
-            while not disp:
-                newTimestamp = time.time()
-                if (newTimestamp - oldTimestamp) >= TIMEOUT:
-
-                    await message.channel.send(frames[int(i)])
-                    
-                    newTimestamp = time.time()
-
-                    i += (newTimestamp - oldTimestamp)/TIMEOUT
-                    
-                    oldTimestamp = newTimestamp
-
-                    disp = True
-
-client.run('')#<--- Put bot token here
+async def setup(bot):
+  await bot.add_cog(BadApple(bot))
