@@ -7,12 +7,12 @@ import yt_dlp
 # yt-dlpのオプション設定
 YDL_OPTIONS = {"format": "bestaudio/best", "noplaylist": "True"}
 
-# 音質と安定性を向上させたFFmpegオプション
+# 警告が出ないように最適化したFFmpegオプション
 FFMPEG_OPTIONS = {
     "before_options": (
         "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
     ),
-    "options": "-vn -ar 48000 -ac 2 -b:a 192k",
+    "options": "-vn -b:a 192k",
 }
 
 
@@ -20,7 +20,7 @@ class Music(commands.Cog):
 
   def __init__(self, bot):
     self.bot = bot
-    # サーバーごとのループ状態を保持する辞書 {guild_id: {"type": "off"/"single", "url": url, "file": file}}
+    # サーバーごとのループ状態を保持する辞書
     self.loop_modes = {}
 
   @app_commands.command(
@@ -60,7 +60,6 @@ class Music(commands.Cog):
       return
 
     channel_name = interaction.guild.voice_client.channel.name
-    # ループ設定もクリア
     if interaction.guild_id in self.loop_modes:
       del self.loop_modes[interaction.guild_id]
 
@@ -79,7 +78,6 @@ class Music(commands.Cog):
       return
 
     voice_client.stop()
-    # ループも解除する場合
     if interaction.guild_id in self.loop_modes:
       self.loop_modes[interaction.guild_id]["type"] = "off"
 
@@ -147,7 +145,6 @@ class Music(commands.Cog):
     if guild_id not in self.loop_modes:
       self.loop_modes[guild_id] = {"type": "off", "url": None, "file_url": None}
 
-    # 再生ソースを保存（ループ用）
     if url:
       self.loop_modes[guild_id]["url"] = url
       self.loop_modes[guild_id]["file_url"] = None
@@ -163,7 +160,6 @@ class Music(commands.Cog):
         print(f"Player error: {error}")
         return
 
-      # ループ設定が有効な場合の自動再生まわし
       mode_data = self.loop_modes.get(guild_id, {"type": "off"})
       if mode_data["type"] == "single":
         try:
