@@ -20,6 +20,8 @@ class Music(commands.Cog):
 
   def __init__(self, bot):
     self.bot = bot
+    # サーバーごとのループ状態を保持する辞書 {guild_id: {"type": "off"/"single", "url": url, "file": file}}
+    self.loop_modes = {}
 
   @app_commands.command(
       name="join", description="あなたが接続しているボイスチャンネルに参加します"
@@ -58,11 +60,57 @@ class Music(commands.Cog):
       return
 
     channel_name = interaction.guild.voice_client.channel.name
-    await interaction.guild.voice_client.disconnect()
+    # ループ設定もクリア
+    if interaction.guild_id in self.loop_modes:
+      del self.loop_modes[interaction.guild_id]
 
+    await interaction.guild.voice_client.disconnect()
     await interaction.response.send_message(
         f"👋 **{channel_name}** から退出しました！", ephemeral=True
     )
+
+  @app_commands.command(name="stop", description="音楽の再生を停止します")
+  async def stop(self, interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if not voice_client or not voice_client.is_playing():
+      await interaction.response.send_message(
+          "現在再生中の音楽はありません。", ephemeral=True
+      )
+      return
+
+    voice_client.stop()
+    # ループも解除する場合
+    if interaction.guild_id in self.loop_modes:
+      self.loop_modes[interaction.guild_id]["type"] = "off"
+
+    await interaction.response.send_message(
+        "⏹️ 音楽の再生を停止しました。", ephemeral=True
+    )
+
+  @app_commands.command(
+      name="repeat", description="現在の曲のループ再生を切り替えます"
+  )
+  @app_commands.choices(
+      mode=[
+          app_commands.Choice(name="オフ (Off)", value="off"),
+          app_commands.Choice(name="1曲ループ (Single)", value="single"),
+      ]
+  )
+  async def repeat(self, interaction: discord.Interaction, mode: str):
+    guild_id = interaction.guild_id
+    if guild_id not in self.loop_modes:
+      self.loop_modes[guild_id] = {"type": "off", "url": None, "file_url": None}
+
+    self.loop_modes[guild_id]["type"] = mode
+
+    if mode == "single":
+      await interaction.response.send_message(
+          "🔂 1曲ループを有効にしました。", ephemeral=True
+      )
+    else:
+      await interaction.response.send_message(
+          "🔁 ループをオフにしました。", ephemeral=True
+      )
 
   @app_commands.command(
       name="play", description="URLまたは音声ファイル（添付）を再生します"
@@ -85,7 +133,6 @@ class Music(commands.Cog):
       )
       return
 
-    # どちらも未指定、または両方指定されている場合はエラーにする
     if (url is None) == (file is None):
       await interaction.response.send_message(
           "❌ 「URL」または「ファイル」の**どちらか片方のみ**を必ず指定してください！",
@@ -96,34 +143,63 @@ class Music(commands.Cog):
     await interaction.response.defer(ephemeral=True)
     voice_client = interaction.guild.voice_client
 
+    guild_id = interaction.guild_id
+    if guild_id not in self.loop_modes:
+      self.loop_modes[guild_id] = {"type": "off", "url": None, "file_url": None}
+
+    # 再生ソースを保存（ループ用）
+    if url:
+      self.loop_modes[guild_id]["url"] = url
+      self.loop_modes[guild_id]["file_url"] = None
+    elif file:
+      self.loop_modes[guild_id]["url"] = None
+      self.loop_modes[guild_id]["file_url"] = file.url
+
     if voice_client.is_playing():
       voice_client.stop()
 
+    def play_next(error):
+      if error:
+        print(f"Player error: {error}")
+        return
+
+      # ループ設定が有効な場合の自動再生まわし
+      mode_data = self.loop_modes.get(guild_id, {"type": "off"})
+      if mode_data["type"] == "single":
+        try:
+          if mode_data["url"]:
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+              info = ydl.extract_info(mode_data["url"], download=False)
+              audio_url = info["url"]
+            source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
+            voice_client.play(source, after=play_next)
+          elif mode_data["file_url"]:
+            source = discord.FFmpegPCMAudio(
+                mode_data["file_url"], **FFMPEG_OPTIONS
+            )
+            voice_client.play(source, after=play_next)
+        except Exception as e:
+          print(f"Loop play error: {e}")
+
     try:
       if url:
-        # URLからの再生処理
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
           info = ydl.extract_info(url, download=False)
           audio_url = info["url"]
           title = info.get("title", url)
 
         source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
-        voice_client.play(
-            source, after=lambda e: print(f"Player error: {e}") if e else None
-        )
+        voice_client.play(source, after=play_next)
         await interaction.followup.send(
             f"🎵 URLから再生を開始しました: **{title}**", ephemeral=True
         )
 
       elif file:
-        # 添付ファイルからの再生処理
         file_url = file.url
         filename = file.filename
 
         source = discord.FFmpegPCMAudio(file_url, **FFMPEG_OPTIONS)
-        voice_client.play(
-            source, after=lambda e: print(f"Player error: {e}") if e else None
-        )
+        voice_client.play(source, after=play_next)
         await interaction.followup.send(
             f"🎵 ファイルから再生を開始しました: **{filename}**", ephemeral=True
         )
