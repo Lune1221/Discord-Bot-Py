@@ -29,7 +29,7 @@ class Events(commands.Cog):
   def cog_unload(self):
     self.scheduled_message_loop.cancel()
 
-  # 1. 予約メッセージ送信ループ (ready.js 相当)
+  # 1. 予約メッセージ送信ループ
   @tasks.loop(minutes=1)
   async def scheduled_message_loop(self):
     pool = getattr(self.bot, "pool", None)
@@ -59,7 +59,7 @@ class Events(commands.Cog):
   async def before_scheduled_message_loop(self):
     await self.bot.wait_until_ready()
 
-  # 2. 起動時・コマンド自動同期 (ready.js 相当)
+  # 2. 起動時・コマンド自動同期
   @commands.Cog.listener()
   async def on_ready(self):
     print(f"{self.bot.user} でログインしました！")
@@ -77,7 +77,7 @@ class Events(commands.Cog):
     except Exception as e:
       print("コマンド登録エラー:", e)
 
-  # 3. メッセージ作成・荒らし対策・レベルアップ・スティッキー (messageCreate.js 相当)
+  # 3. メッセージ作成・荒らし対策・レベルアップ・スティッキー
   @commands.Cog.listener()
   async def on_message(self, message: discord.Message):
     if message.author.bot or not message.guild:
@@ -86,7 +86,7 @@ class Events(commands.Cog):
     if not pool:
       return
 
-    # 🛡️ 荒らし対策チェック（有効時）
+    # 🛡️ 荒らし対策チェック
     try:
       raid_check = await pool.fetchrow(
           "SELECT enabled FROM antiraid_settings WHERE guild_id = $1",
@@ -222,7 +222,7 @@ class Events(commands.Cog):
     except Exception:
       pass
 
-  # 4. ボイスステート更新・VC自己紹介表示 (voiceStateUpdate.js 相当)
+  # 4. ボイスステート更新・VC自己紹介表示
   @commands.Cog.listener()
   async def on_voice_state_update(
       self,
@@ -232,7 +232,9 @@ class Events(commands.Cog):
   ):
     if before.channel == after.channel:
       return
-    guild = after.guild or before.guild
+    
+    # member.guild から確実にサーバーを取得する
+    guild = member.guild
     pool = getattr(self.bot, "pool", None)
     if not pool:
       return
