@@ -6,11 +6,13 @@ import yt_dlp
 
 # yt-dlpのオプション設定
 YDL_OPTIONS = {"format": "bestaudio/best", "noplaylist": "True"}
+
+# 音質と安定性を向上させたFFmpegオプション
 FFMPEG_OPTIONS = {
     "before_options": (
         "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
     ),
-    "options": "-vn",
+    "options": "-vn -ar 48000 -ac 2 -b:a 192k",
 }
 
 
@@ -60,7 +62,7 @@ class Music(commands.Cog):
 
     await interaction.response.send_message(
         f"👋 **{channel_name}** から退出しました！", ephemeral=True
-      )
+    )
 
   @app_commands.command(
       name="play", description="URLまたは音声ファイル（添付）を再生します"
@@ -114,7 +116,7 @@ class Music(commands.Cog):
         )
 
       elif file:
-        # 添付ファイルからの再生処理（スマホのファイル選択から直に送れます）
+        # 添付ファイルからの再生処理
         file_url = file.url
         filename = file.filename
 
