@@ -4,3 +4,5 @@ asyncpg
 python-dotenv
 Pillow
 opencv-python
+yt-dlp
+PyNaCl
