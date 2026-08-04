@@ -1,8 +1,9 @@
 discord.py
-flask
+Flask
 asyncpg
 python-dotenv
 Pillow
 opencv-python
 yt-dlp
 PyNaCl
+davey
