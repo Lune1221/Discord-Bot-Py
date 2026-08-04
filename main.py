@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+import asyncpg
 import discord
 from discord.ext import commands
 from flask import Flask
@@ -37,7 +38,24 @@ async def on_ready():
       f"=== ログイン成功: {bot.user.name} (ID: {bot.user.id}) ===", flush=True
   )
 
-  # 【重要】cogs フォルダ内にあるすべての .py ファイルを自動で一括読み込みする
+  # === 【追加】データベース（PostgreSQL）に接続して bot.pool を作成する ===
+  if not hasattr(bot, "pool"):
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+      try:
+        bot.pool = await asyncpg.create_pool(database_url)
+        print("✅ データベース（PostgreSQL）への接続に成功しました！", flush=True)
+      except Exception as e:
+        print(
+            f"❌ 【データベース接続失敗】 エラー詳細: {e}", flush=True
+        )
+    else:
+      print(
+          "⚠️ 【警告】 データベースのURL（DATABASE_URL）が環境変数に設定されていません。",
+          flush=True,
+      )
+
+  # cogs フォルダ内にあるすべての .py ファイルを自動で一括読み込みする
   if os.path.exists("./cogs"):
     for filename in os.listdir("./cogs"):
       if filename.endswith(".py"):
