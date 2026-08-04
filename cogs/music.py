@@ -14,33 +14,6 @@ FFMPEG_OPTIONS = {
 }
 
 
-class MusicSelectView(discord.ui.View):
-
-  def __init__(self):
-    super().__init__(timeout=60)
-    self.selection = None
-
-  @discord.ui.button(
-      label="URLから再生", style=discord.ButtonStyle.primary, emoji="🔗"
-  )
-  async def url_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    self.selection = "url"
-    self.stop()
-    await interaction.response.defer()
-
-  @discord.ui.button(
-      label="ファイルから再生", style=discord.ButtonStyle.secondary, emoji="📁"
-  )
-  async def file_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    self.selection = "file"
-    self.stop()
-    await interaction.response.defer()
-
-
 class Music(commands.Cog):
 
   def __init__(self, bot):
@@ -56,15 +29,21 @@ class Music(commands.Cog):
       )
       return
 
+    await interaction.response.defer(ephemeral=True)
     channel = interaction.user.voice.channel
-    if interaction.guild.voice_client is not None:
-      await interaction.guild.voice_client.move_to(channel)
-    else:
-      await channel.connect()
+    try:
+      if interaction.guild.voice_client is not None:
+        await interaction.guild.voice_client.move_to(channel)
+      else:
+        await channel.connect()
 
-    await interaction.response.send_message(
-        f"📢 **{channel.name}** に参加しました！", ephemeral=True
-    )
+      await interaction.followup.send(
+          f"📢 **{channel.name}** に参加しました！", ephemeral=True
+      )
+    except Exception as e:
+      await interaction.followup.send(
+          f"❌ 参加に失敗しました: {e}", ephemeral=True
+      )
 
   @app_commands.command(
       name="leave", description="ボイスチャンネルから退出します"
@@ -81,13 +60,21 @@ class Music(commands.Cog):
 
     await interaction.response.send_message(
         f"👋 **{channel_name}** から退出しました！", ephemeral=True
-    )
+      )
 
   @app_commands.command(
-      name="play", description="指定したURLまたはファイルパスの音楽を再生します"
+      name="play", description="URLまたは音声ファイル（添付）を再生します"
   )
-  @app_commands.describe(music="再生するURLまたはローカルファイルパスを入力してください")
-  async def play(self, interaction: discord.Interaction, music: str):
+  @app_commands.describe(
+      url="再生する音楽のURLを入力してください",
+      file="再生する音声ファイル（mp3/wavなど）を添付してください",
+  )
+  async def play(
+      self,
+      interaction: discord.Interaction,
+      url: str = None,
+      file: discord.Attachment = None,
+  ):
     if not interaction.guild.voice_client:
       await interaction.response.send_message(
           "ボットがボイスチャンネルに参加していません。先に `/join`"
@@ -96,77 +83,53 @@ class Music(commands.Cog):
       )
       return
 
-    # 選択式ボタンを表示
-    view = MusicSelectView()
-    await interaction.response.send_message(
-        f"入力された内容: `{music}`\n再生方法を選択してください：",
-        view=view,
-        ephemeral=True,
-    )
-
-    # ユーザーのボタン入力を待機
-    await view.wait()
-
-    if view.selection is None:
-      try:
-        await interaction.edit_original_response(
-            content="選択時間がタイムアウトしました。", view=None
-        )
-      except Exception:
-        pass
+    # どちらも未指定、または両方指定されている場合はエラーにする
+    if (url is None) == (file is None):
+      await interaction.response.send_message(
+          "❌ 「URL」または「ファイル」の**どちらか片方のみ**を必ず指定してください！",
+          ephemeral=True,
+      )
       return
 
+    await interaction.response.defer(ephemeral=True)
     voice_client = interaction.guild.voice_client
 
-    if view.selection == "url":
-      await interaction.edit_original_response(
-          content=f"🔗 URLから再生準備中... (`{music}`)", view=None
-      )
-      try:
+    if voice_client.is_playing():
+      voice_client.stop()
+
+    try:
+      if url:
+        # URLからの再生処理
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-          info = ydl.extract_info(music, download=False)
-          url2 = info["url"]
+          info = ydl.extract_info(url, download=False)
+          audio_url = info["url"]
+          title = info.get("title", url)
 
-        if voice_client.is_playing():
-          voice_client.stop()
-
-        source = discord.FFmpegPCMAudio(url2, **FFMPEG_OPTIONS)
+        source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
         voice_client.play(
             source, after=lambda e: print(f"Player error: {e}") if e else None
         )
-        await interaction.edit_original_response(
-            content=f"🎵 再生を開始しました: **{info.get('title', music)}**"
-        )
-      except Exception as e:
-        await interaction.edit_original_response(
-            content=f"❌ URLの再生に失敗しました: {e}"
+        await interaction.followup.send(
+            f"🎵 URLから再生を開始しました: **{title}**", ephemeral=True
         )
 
-    elif view.selection == "file":
-      await interaction.edit_original_response(
-          content=f"📁 ファイルから再生準備中... (`{music}`)", view=None
+      elif file:
+        # 添付ファイルからの再生処理（スマホのファイル選択から直に送れます）
+        file_url = file.url
+        filename = file.filename
+
+        source = discord.FFmpegPCMAudio(file_url, **FFMPEG_OPTIONS)
+        voice_client.play(
+            source, after=lambda e: print(f"Player error: {e}") if e else None
+        )
+        await interaction.followup.send(
+            f"🎵 ファイルから再生を開始しました: **{filename}**", ephemeral=True
+        )
+
+    except Exception as e:
+      await interaction.followup.send(
+          f"❌ 再生に失敗しました: {e}", ephemeral=True
       )
-      if not os.path.exists(music):
-        await interaction.edit_original_response(
-            content=f"❌ 指定されたファイルが見つかりません: `{music}`"
-        )
-        return
-
-      try:
-        if voice_client.is_playing():
-          voice_client.stop()
-
-        source = discord.FFmpegPCMAudio(music)
-        voice_client.play(
-            source, after=lambda e: print(f"Player error: {e}") if e else None
-        )
-        await interaction.edit_original_response(
-            content=f"🎵 ローカルファイルの再生を開始しました: **{music}**"
-        )
-      except Exception as e:
-        await interaction.edit_original_response(
-            content=f"❌ ファイルの再生に失敗しました: {e}"
-        )
 
 
 async def setup(bot):
