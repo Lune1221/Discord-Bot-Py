@@ -21,4 +21,5 @@ Botのすべての機能を含めたリポジトリをご自身の環境（VPS�
    pip install -r requirements.txt
 3. 環境変数（.env）にボットのトークンやデータベース接続情報を設定します。
 4. メインファイルを起動します。
-   ```python main.py
+   ```bash
+   python main.py
