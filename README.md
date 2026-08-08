@@ -7,7 +7,7 @@
 1. [招待リンク](https://discord.com/oauth2/authorize?client_id=1528013651384991754&permissions=2147551232&integration_type=0&scope=applications.commands+bot) からボットをサーバーに追加します。
 2. 必要なスラッシュコマンド（`/count`, `/omikuji`, `/aa` など）をそのまま使用できます。
 
-### 2. Luneのコードを自分の既存ボットに「部分移植」する場合
+### 2. Botのコードを自分の既存ボットに「部分移植」する場合
 すでに動いている自作のDiscordボットに、特定の機能（音楽再生、画像アスキーアート変換、荒らし対策など）だけをCog単位で組み込みたい場合の方法です。
 1. `cogs/` フォルダの中身（例: `music.py`, `image_to_aa.py` など）から、使いたいファイルをご自身のボットのプロジェクトにコピーします。
 2. メインのボットファイル（`main.py` 等）で `await bot.load_extension("cogs.ファイル名")` を実行して読み込ませます。
