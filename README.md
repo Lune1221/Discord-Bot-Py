@@ -23,3 +23,20 @@ Botのすべての機能を含めたリポジトリをご自身の環境（VPS�
 4. メインファイルを起動します。
    ```bash
    python main.py
+
+## 🛠️ 使用技術・ライブラリ (Technologies & Libraries)
+
+このボットを完全移植、または一部のCogを導入する際は、以下のライブラリが必要です。
+環境に合わせて `pip install` で導入してください。
+
+### 📦 Pythonパッケージ (`requirements.txt`)
+* **[discord.py](https://github.com/Rapptz/discord.py)** : Discordボットのメインフレームワーク
+* **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** : YouTubeからの音声を取得（Music機能）
+* **[PyNaCl](https://pypi.org/project/PyNaCl/)** : ボイスチャンネルを利用するためのライブラリ
+* **[Pillow (PIL)](https://pillow.readthedocs.io/)** : 画像のリサイズやアスキーアート変換処理（`/aa` 機能）
+* **[asyncpg](https://github.com/MagicStack/asyncpg)** : PostgreSQLデータベースとの非同期接続（レベル・荒らし対策などのデータ管理）
+* **[Flask](https://flask.palletsprojects.com/)** : ホスティング環境でのスリープ防止用Webサーバー
+
+### ⚙️ 外部ツール（システム要件）
+音楽機能（`cogs/music.py`）を使用する場合、Pythonライブラリに加えてシステム本体に以下のツールがインストールされている必要があります。
+* **FFmpeg** : 音声データのストリーミング変換処理に使用します。
