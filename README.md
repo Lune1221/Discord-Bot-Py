@@ -18,4 +18,7 @@ Botのすべての機能を含めたリポジトリをご自身の環境（VPS�
 1. このリポジトリをクローンまたはダウンロードします。
 2. 必要なPythonライブラリをインストールします。
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements.txt```
+3. 環境変数（.env）にボットのトークンやデータベース接続情報を設定します。
+4. メインファイルを起動します。
+   ```python main.py```
