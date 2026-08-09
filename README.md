@@ -3,7 +3,7 @@
 利用環境や目的に合わせて、以下の3つの方法から選んで導入できます。
 
 ### 1. Botをそのまま自分のサーバーに入れる場合（一番楽）
-すでにホスティングされている（またはご自身で動かす）Botを、そのままDiscordサーバーに招待して使う一般的な方法です。
+すでにホスティングされているBotを、そのままDiscordサーバーに招待して使う一般的な方法です。
 1. [招待リンク](https://discord.com/oauth2/authorize?client_id=1528013651384991754&permissions=2147551232&integration_type=0&scope=applications.commands+bot) からボットをサーバーに追加します。
 2. 必要なスラッシュコマンド（`/count`, `/omikuji`, `/aa` など）をそのまま使用できます。
 
