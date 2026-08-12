@@ -24,68 +24,92 @@ class RoleButton(discord.ui.Button):
         self,
         role_id: int,
         label: str,
-        emoji: str
+        emoji: str,
+        panel_id: int
     ):
+        # ========================================
+        # custom_idをパネルごとに一意にする
+        # ========================================
+
+        custom_id = (
+            f"rolepanel:{panel_id}:{role_id}"
+        )
+
         super().__init__(
             label=label,
             emoji=emoji,
             style=discord.ButtonStyle.primary,
-            custom_id=f"rolepanel:{role_id}",
+            custom_id=custom_id
         )
 
-        self.role_id = int(role_id)
+        self.role_id = role_id
+        self.panel_id = panel_id
+
+    # ========================================
+    # ボタンCallback
+    # ========================================
 
     async def callback(
         self,
         interaction: discord.Interaction
     ):
-        """
-        ロールボタン処理
-
-        Interactionは最初に1回だけACKする。
-        defer後は interaction.followup を使用する。
-        """
 
         # ========================================
-        # Interaction ACK
+        # Interactionを最優先でACK
         # ========================================
 
         try:
+
             if not interaction.response.is_done():
+
                 await interaction.response.defer(
                     ephemeral=True
                 )
+
+        except discord.InteractionResponded:
+
+            pass
+
         except discord.NotFound:
+
             print(
                 "❌ Interactionが期限切れです。",
                 flush=True
             )
+
             return
 
         except discord.HTTPException as e:
+
             print(
                 f"❌ Interaction defer エラー: {e}",
                 flush=True
             )
+
             return
 
         # ========================================
         # Guild確認
         # ========================================
 
-        if interaction.guild is None:
+        guild = interaction.guild
 
-            await self._followup(
-                interaction,
-                "❌ サーバー内で使用してください。"
-            )
+        if guild is None:
+
+            try:
+
+                await interaction.followup.send(
+                    "❌ サーバー内で使用してください。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
 
             return
 
-        guild = interaction.guild
-
         # ========================================
-        # ユーザー取得
+        # Member取得
         # ========================================
 
         try:
@@ -95,57 +119,39 @@ class RoleButton(discord.ui.Button):
             )
 
             if member is None:
+
                 member = await guild.fetch_member(
                     interaction.user.id
                 )
 
-        except discord.NotFound:
-
-            await self._followup(
-                interaction,
-                "❌ ユーザー情報を取得できませんでした。"
-            )
-
-            return
-
         except discord.HTTPException as e:
 
             print(
-                f"❌ ユーザー取得エラー: {e}",
+                f"❌ Member取得エラー: {e}",
                 flush=True
             )
 
-            await self._followup(
-                interaction,
-                "❌ ユーザー情報を取得できませんでした。"
-            )
+            try:
+
+                await interaction.followup.send(
+                    "❌ ユーザー情報を取得できませんでした。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
 
             return
 
         # ========================================
-        # ロール取得
-        #
-        # get_role()だけではなく
-        # fetch_role()でDiscord APIから直接取得する
+        # Role取得
         # ========================================
 
-        role = None
+        role = guild.get_role(
+            self.role_id
+        )
 
-        try:
-
-            # まずキャッシュから取得
-            role = guild.get_role(
-                self.role_id
-            )
-
-            # キャッシュになければAPIから取得
-            if role is None:
-
-                role = await guild.fetch_role(
-                    self.role_id
-                )
-
-        except discord.NotFound:
+        if role is None:
 
             print(
                 f"❌ ロールが存在しません: "
@@ -154,80 +160,21 @@ class RoleButton(discord.ui.Button):
                 flush=True
             )
 
-            await self._followup(
-                interaction,
-                "❌ 指定されたロールIDは無効です。\n"
-                "このパネルに保存されているロールが削除されている可能性があります。"
-            )
+            try:
 
-            return
+                await interaction.followup.send(
+                    "❌ 指定されたロールIDは無効です。\n"
+                    "ロールが削除されている可能性があります。",
+                    ephemeral=True
+                )
 
-        except discord.HTTPException as e:
-
-            print(
-                f"❌ ロール取得APIエラー: "
-                f"guild={guild.id}, "
-                f"role_id={self.role_id}, "
-                f"error={e}",
-                flush=True
-            )
-
-            await self._followup(
-                interaction,
-                "❌ Discordからロール情報を取得できませんでした。"
-            )
+            except Exception:
+                pass
 
             return
 
         # ========================================
-        # ロール取得確認
-        # ========================================
-
-        if role is None:
-
-            await self._followup(
-                interaction,
-                "❌ ロールを取得できませんでした。"
-            )
-
-            return
-
-        # ========================================
-        # ロールがこのGuildのものか確認
-        # ========================================
-
-        if role.guild.id != guild.id:
-
-            print(
-                f"❌ Guild不一致: "
-                f"interaction_guild={guild.id}, "
-                f"role_guild={role.guild.id}, "
-                f"role_id={role.id}",
-                flush=True
-            )
-
-            await self._followup(
-                interaction,
-                "❌ このロールは現在のサーバーのロールではありません。"
-            )
-
-            return
-
-        # ========================================
-        # @everyone
-        # ========================================
-
-        if role.is_default():
-
-            await self._followup(
-                interaction,
-                "❌ @everyone ロールは操作できません。"
-            )
-
-            return
-
-        # ========================================
-        # Bot取得
+        # Bot Member取得
         # ========================================
 
         bot_member = guild.me
@@ -235,41 +182,60 @@ class RoleButton(discord.ui.Button):
         if bot_member is None:
 
             try:
-                bot_member = await guild.fetch_member(
-                    self.bot.user.id
+
+                await interaction.followup.send(
+                    "❌ Bot情報を取得できませんでした。",
+                    ephemeral=True
                 )
+
             except Exception:
-                bot_member = None
-
-        if bot_member is None:
-
-            await self._followup(
-                interaction,
-                "❌ Bot情報を取得できませんでした。"
-            )
+                pass
 
             return
 
         # ========================================
-        # Botの最高位ロール確認
+        # @everyone確認
+        # ========================================
+
+        if role.is_default():
+
+            try:
+
+                await interaction.followup.send(
+                    "❌ @everyone ロールは操作できません。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
+
+            return
+
+        # ========================================
+        # Botのロールより上か確認
         # ========================================
 
         if role >= bot_member.top_role:
 
             print(
-                f"❌ Botより上位のロール: "
+                f"❌ Botが操作できないロール: "
                 f"guild={guild.id}, "
-                f"role={role.name}, "
-                f"role_id={role.id}, "
-                f"bot_top_role={bot_member.top_role.name}",
+                f"role={role.id}, "
+                f"role_position={role.position}, "
+                f"bot_position={bot_member.top_role.position}",
                 flush=True
             )
 
-            await self._followup(
-                interaction,
-                "❌ このロールはBotが操作できません。\n"
-                "Botのロールを対象ロールより上に移動してください。"
-            )
+            try:
+
+                await interaction.followup.send(
+                    "❌ このロールはBotが操作できません。\n"
+                    "Botのロールを対象ロールより上に移動してください。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
 
             return
 
@@ -279,10 +245,15 @@ class RoleButton(discord.ui.Button):
 
         if not bot_member.guild_permissions.manage_roles:
 
-            await self._followup(
-                interaction,
-                "❌ Botに「ロールの管理」権限がありません。"
-            )
+            try:
+
+                await interaction.followup.send(
+                    "❌ Botに「ロールの管理」権限がありません。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
 
             return
 
@@ -292,9 +263,10 @@ class RoleButton(discord.ui.Button):
 
         try:
 
-            # ====================================
-            # 持っている → 解除
-            # ====================================
+            # ----------------------------------------
+            # 既に持っている
+            # → 解除
+            # ----------------------------------------
 
             if role in member.roles:
 
@@ -304,20 +276,30 @@ class RoleButton(discord.ui.Button):
                 )
 
                 print(
-                    f" ロール解除成功: "
+                    f"🔴 ロール解除: "
                     f"user={member.id}, "
-                    f"role={role.name} ({role.id})",
+                    f"role={role.id}",
                     flush=True
                 )
 
-                await self._followup(
-                    interaction,
-                    f" **{role.name}** を解除しました。"
-                )
+                try:
 
-            # ====================================
-            # 持っていない → 取得
-            # ====================================
+                    await interaction.followup.send(
+                        f"🔴 **{role.name}** を解除しました。",
+                        ephemeral=True
+                    )
+
+                except Exception as e:
+
+                    print(
+                        f"❌ 結果送信エラー: {e}",
+                        flush=True
+                    )
+
+            # ----------------------------------------
+            # 持っていない
+            # → 取得
+            # ----------------------------------------
 
             else:
 
@@ -327,16 +309,25 @@ class RoleButton(discord.ui.Button):
                 )
 
                 print(
-                    f" ロール取得成功: "
+                    f"🟢 ロール取得: "
                     f"user={member.id}, "
-                    f"role={role.name} ({role.id})",
+                    f"role={role.id}",
                     flush=True
                 )
 
-                await self._followup(
-                    interaction,
-                    f" **{role.name}** を取得しました。"
-                )
+                try:
+
+                    await interaction.followup.send(
+                        f"🟢 **{role.name}** を取得しました。",
+                        ephemeral=True
+                    )
+
+                except Exception as e:
+
+                    print(
+                        f"❌ 結果送信エラー: {e}",
+                        flush=True
+                    )
 
         # ========================================
         # 権限エラー
@@ -348,36 +339,42 @@ class RoleButton(discord.ui.Button):
                 f"❌ ロール操作Forbidden: "
                 f"guild={guild.id}, "
                 f"user={member.id}, "
-                f"role={role.name} ({role.id}), "
-                f"bot_top_role={bot_member.top_role.name}",
+                f"role={role.id}",
                 flush=True
             )
 
-            await self._followup(
-                interaction,
-                "❌ Botにロールを操作する権限がありません。\n"
-                "Botのロールが対象ロールより上にあることを確認してください。"
-            )
+            try:
+
+                await interaction.followup.send(
+                    "❌ Botにロールを操作する権限がありません。\n\n"
+                    "Botのロールが対象ロールより上にあるか、"
+                    "「ロールの管理」権限があるか確認してください。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
 
         # ========================================
-        # Discord APIエラー
+        # HTTPエラー
         # ========================================
 
         except discord.HTTPException as e:
 
             print(
-                f"❌ Discord APIロール操作エラー: "
-                f"guild={guild.id}, "
-                f"user={member.id}, "
-                f"role={role.name} ({role.id}), "
-                f"error={e}",
+                f"❌ Discord APIエラー: {e}",
                 flush=True
             )
 
-            await self._followup(
-                interaction,
-                "❌ Discord APIでロール操作に失敗しました。"
-            )
+            try:
+
+                await interaction.followup.send(
+                    "❌ Discord APIでエラーが発生しました。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
 
         # ========================================
         # その他
@@ -390,34 +387,15 @@ class RoleButton(discord.ui.Button):
                 flush=True
             )
 
-            await self._followup(
-                interaction,
-                "❌ ロール操作中にエラーが発生しました。"
-            )
+            try:
 
-    # ========================================
-    # Followup安全送信
-    # ========================================
+                await interaction.followup.send(
+                    "❌ ロール操作中にエラーが発生しました。",
+                    ephemeral=True
+                )
 
-    async def _followup(
-        self,
-        interaction: discord.Interaction,
-        content: str
-    ):
-
-        try:
-
-            await interaction.followup.send(
-                content,
-                ephemeral=True
-            )
-
-        except discord.HTTPException as e:
-
-            print(
-                f"❌ Followup送信エラー: {e}",
-                flush=True
-            )
+            except Exception:
+                pass
 
 
 # ========================================
@@ -428,7 +406,8 @@ class RolePanelView(discord.ui.View):
 
     def __init__(
         self,
-        roles: list[tuple[int, str]]
+        roles: list[tuple[int, str]],
+        panel_id: int
     ):
 
         super().__init__(
@@ -438,15 +417,19 @@ class RolePanelView(discord.ui.View):
         for index, (role_id, role_name) in enumerate(roles):
 
             if index < len(ROLE_EMOJIS):
+
                 emoji = ROLE_EMOJIS[index]
+
             else:
+
                 emoji = "🏷️"
 
             self.add_item(
                 RoleButton(
-                    role_id=int(role_id),
+                    role_id=role_id,
                     label=role_name,
-                    emoji=emoji
+                    emoji=emoji,
+                    panel_id=panel_id
                 )
             )
 
@@ -461,6 +444,7 @@ class RolePanel(commands.Cog):
         self,
         bot: commands.Bot
     ):
+
         self.bot = bot
 
     # ========================================
@@ -472,15 +456,14 @@ class RolePanel(commands.Cog):
         if not hasattr(self.bot, "pool"):
 
             print(
-                "⚠️ rolepanel: PostgreSQLが利用できないため、"
-                "パネル復元をスキップします。",
+                "⚠️ rolepanel: PostgreSQLが利用できません。",
                 flush=True
             )
 
             return
 
         # ========================================
-        # DBテーブル
+        # DBテーブル作成
         # ========================================
 
         try:
@@ -528,7 +511,7 @@ class RolePanel(commands.Cog):
             )
 
     # ========================================
-    # パネル復元
+    # DBから復元
     # ========================================
 
     async def restore_panels(self):
@@ -551,30 +534,42 @@ class RolePanel(commands.Cog):
 
         for row in rows:
 
+            panel_id = row["id"]
+
+            # ========================================
+            # Guild
+            # ========================================
+
             guild = self.bot.get_guild(
-                int(row["guild_id"])
+                row["guild_id"]
             )
 
             if guild is None:
+
                 continue
 
+            # ========================================
+            # Channel
+            # ========================================
+
             channel = guild.get_channel(
-                int(row["channel_id"])
+                row["channel_id"]
             )
 
             if channel is None:
+
                 continue
 
-            roles = []
+            # ========================================
+            # Role
+            # ========================================
 
-            # ========================================
-            # 保存されているRole IDを確認
-            # ========================================
+            roles = []
 
             for role_id in row["role_ids"]:
 
                 role = guild.get_role(
-                    int(role_id)
+                    role_id
                 )
 
                 if role is not None:
@@ -586,36 +581,30 @@ class RolePanel(commands.Cog):
                         )
                     )
 
-                else:
-
-                    print(
-                        f"⚠️ 保存済みロールが存在しません: "
-                        f"guild={guild.id}, "
-                        f"role_id={role_id}",
-                        flush=True
-                    )
-
             # ========================================
-            # ロールが1つもない
+            # 全ロールが消えている
             # ========================================
 
             if not roles:
 
-                await self.bot.pool.execute(
-                    """
-                    DELETE FROM role_panels
-                    WHERE id = $1
-                    """,
-                    row["id"]
-                )
+                try:
 
-                deleted += 1
+                    await self.bot.pool.execute(
+                        """
+                        DELETE FROM role_panels
+                        WHERE id = $1
+                        """,
+                        panel_id
+                    )
 
-                print(
-                    f"🗑️ 無効なパネルをDBから削除: "
-                    f"message_id={row['message_id']}",
-                    flush=True
-                )
+                    deleted += 1
+
+                except Exception as e:
+
+                    print(
+                        f"❌ DB削除エラー: {e}",
+                        flush=True
+                    )
 
                 continue
 
@@ -626,15 +615,24 @@ class RolePanel(commands.Cog):
             try:
 
                 view = RolePanelView(
-                    roles
+                    roles=roles,
+                    panel_id=panel_id
                 )
 
                 self.bot.add_view(
                     view,
-                    message_id=int(row["message_id"])
+                    message_id=row["message_id"]
                 )
 
                 restored += 1
+
+                print(
+                    f"🔄 パネル復元: "
+                    f"panel_id={panel_id}, "
+                    f"message_id={row['message_id']}, "
+                    f"role_ids={row['role_ids']}",
+                    flush=True
+                )
 
             except Exception as e:
 
@@ -675,44 +673,74 @@ class RolePanel(commands.Cog):
     ):
 
         # ========================================
-        # サーバー確認
+        # 最初にACK
         # ========================================
 
-        if interaction.guild is None:
+        try:
 
-            await interaction.response.send_message(
-                "❌ サーバー内で使用してください。",
-                ephemeral=True
+            if not interaction.response.is_done():
+
+                await interaction.response.defer(
+                    ephemeral=True
+                )
+
+        except discord.HTTPException as e:
+
+            print(
+                f"❌ /rolepanel deferエラー: {e}",
+                flush=True
             )
 
             return
 
+        # ========================================
+        # Guild
+        # ========================================
+
         guild = interaction.guild
 
+        if guild is None:
+
+            try:
+
+                await interaction.followup.send(
+                    "❌ サーバー内で使用してください。",
+                    ephemeral=True
+                )
+
+            except Exception:
+                pass
+
+            return
+
         # ========================================
-        # ロール一覧
+        # Role一覧
         # ========================================
 
-        roles = [role1]
+        roles = [
+            role1
+        ]
 
         if role2 is not None:
+
             roles.append(role2)
 
         if role3 is not None:
+
             roles.append(role3)
 
         # ========================================
-        # 重複チェック
+        # 重複
         # ========================================
 
         role_ids = [
-            int(role.id)
+            role.id
             for role in roles
         ]
 
         if len(role_ids) != len(set(role_ids)):
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ 同じロールを複数指定することはできません。",
                 ephemeral=True
             )
@@ -720,14 +748,14 @@ class RolePanel(commands.Cog):
             return
 
         # ========================================
-        # Bot取得
+        # Bot
         # ========================================
 
         bot_member = guild.me
 
         if bot_member is None:
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ Bot情報を取得できませんでした。",
                 ephemeral=True
             )
@@ -735,28 +763,12 @@ class RolePanel(commands.Cog):
             return
 
         # ========================================
-        # Manage Roles確認
+        # @everyone
         # ========================================
 
-        if not bot_member.guild_permissions.manage_roles:
+        if any(role.is_default() for role in roles):
 
-            await interaction.response.send_message(
-                "❌ Botに「ロールの管理」権限がありません。",
-                ephemeral=True
-            )
-
-            return
-
-        # ========================================
-        # @everyone確認
-        # ========================================
-
-        if any(
-            role.is_default()
-            for role in roles
-        ):
-
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ @everyone ロールは指定できません。",
                 ephemeral=True
             )
@@ -764,7 +776,7 @@ class RolePanel(commands.Cog):
             return
 
         # ========================================
-        # Botより上のロール確認
+        # Botが操作できるか
         # ========================================
 
         invalid_roles = [
@@ -780,10 +792,23 @@ class RolePanel(commands.Cog):
                 for role in invalid_roles
             )
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ 以下のロールはBotが操作できません。\n\n"
                 f"{names}\n\n"
                 "Botのロールを対象ロールより上に移動してください。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # Manage Roles
+        # ========================================
+
+        if not bot_member.guild_permissions.manage_roles:
+
+            await interaction.followup.send(
+                "❌ Botに「ロールの管理」権限がありません。",
                 ephemeral=True
             )
 
@@ -804,14 +829,65 @@ class RolePanel(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="ロールパネル",
+            title="🎭 ロールパネル",
             description=description,
             color=discord.Color.blurple()
         )
 
         embed.set_footer(
-            text="ボタンを押すことでロールを取得できます。"
+            text="ボタンを押すことでロールを取得・解除できます。"
         )
+
+        # ========================================
+        # DBへ先にパネルIDを確保
+        # ========================================
+
+        if not hasattr(self.bot, "pool"):
+
+            await interaction.followup.send(
+                "❌ PostgreSQLに接続されていません。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # 仮ID取得
+        # ========================================
+
+        try:
+
+            row = await self.bot.pool.fetchrow(
+                """
+                INSERT INTO role_panels (
+                    guild_id,
+                    channel_id,
+                    message_id,
+                    role_ids
+                )
+                VALUES ($1, $2, 0, $3)
+                RETURNING id
+                """,
+                guild.id,
+                interaction.channel.id,
+                role_ids
+            )
+
+            panel_id = row["id"]
+
+        except Exception as e:
+
+            print(
+                f"❌ パネルID作成エラー: {e}",
+                flush=True
+            )
+
+            await interaction.followup.send(
+                "❌ ロールパネル情報の保存に失敗しました。",
+                ephemeral=True
+            )
+
+            return
 
         # ========================================
         # View
@@ -819,23 +895,34 @@ class RolePanel(commands.Cog):
 
         view_roles = [
             (
-                int(role.id),
+                role.id,
                 role.name
             )
             for role in roles
         ]
 
         view = RolePanelView(
-            view_roles
+            roles=view_roles,
+            panel_id=panel_id
         )
 
         # ========================================
         # チャンネル確認
         # ========================================
 
-        if interaction.channel is None:
+        channel = interaction.channel
 
-            await interaction.response.send_message(
+        if channel is None:
+
+            await self.bot.pool.execute(
+                """
+                DELETE FROM role_panels
+                WHERE id = $1
+                """,
+                panel_id
+            )
+
+            await interaction.followup.send(
                 "❌ チャンネルを取得できませんでした。",
                 ephemeral=True
             )
@@ -848,14 +935,22 @@ class RolePanel(commands.Cog):
 
         try:
 
-            message = await interaction.channel.send(
+            message = await channel.send(
                 embed=embed,
                 view=view
             )
 
         except discord.Forbidden:
 
-            await interaction.response.send_message(
+            await self.bot.pool.execute(
+                """
+                DELETE FROM role_panels
+                WHERE id = $1
+                """,
+                panel_id
+            )
+
+            await interaction.followup.send(
                 "❌ このチャンネルにメッセージを送信する権限がありません。",
                 ephemeral=True
             )
@@ -869,7 +964,15 @@ class RolePanel(commands.Cog):
                 flush=True
             )
 
-            await interaction.response.send_message(
+            await self.bot.pool.execute(
+                """
+                DELETE FROM role_panels
+                WHERE id = $1
+                """,
+                panel_id
+            )
+
+            await interaction.followup.send(
                 "❌ ロールパネルの送信に失敗しました。",
                 ephemeral=True
             )
@@ -877,48 +980,32 @@ class RolePanel(commands.Cog):
             return
 
         # ========================================
-        # DB保存
+        # Message ID保存
         # ========================================
 
-        if hasattr(self.bot, "pool"):
+        try:
 
-            try:
-
-                await self.bot.pool.execute(
-                    """
-                    INSERT INTO role_panels (
-                        guild_id,
-                        channel_id,
-                        message_id,
-                        role_ids
-                    )
-                    VALUES ($1, $2, $3, $4)
-                    """,
-                    int(guild.id),
-                    int(interaction.channel.id),
-                    int(message.id),
-                    role_ids
-                )
-
-                print(
-                    f"✅ ロールパネル保存: "
-                    f"message_id={message.id}, "
-                    f"role_ids={role_ids}",
-                    flush=True
-                )
-
-            except Exception as e:
-
-                print(
-                    f"❌ ロールパネルDB保存失敗: {e}",
-                    flush=True
-                )
-
-        else:
+            await self.bot.pool.execute(
+                """
+                UPDATE role_panels
+                SET message_id = $1
+                WHERE id = $2
+                """,
+                message.id,
+                panel_id
+            )
 
             print(
-                "⚠️ PostgreSQLがないため、"
-                "パネルはDBに保存されません。",
+                f"✅ ロールパネル保存: "
+                f"message_id={message.id}, "
+                f"role_ids={role_ids}",
+                flush=True
+            )
+
+        except Exception as e:
+
+            print(
+                f"❌ ロールパネルDB更新失敗: {e}",
                 flush=True
             )
 
@@ -944,10 +1031,19 @@ class RolePanel(commands.Cog):
         # 完了
         # ========================================
 
-        await interaction.response.send_message(
-            "✅ ロールパネルを作成しました。",
-            ephemeral=True
-        )
+        try:
+
+            await interaction.followup.send(
+                "✅ ロールパネルを作成しました。",
+                ephemeral=True
+            )
+
+        except Exception as e:
+
+            print(
+                f"❌ 完了メッセージ送信エラー: {e}",
+                flush=True
+            )
 
     # ========================================
     # /rolepanel_delete
@@ -966,12 +1062,35 @@ class RolePanel(commands.Cog):
     ):
 
         # ========================================
-        # サーバー確認
+        # 最初にACK
         # ========================================
 
-        if interaction.guild is None:
+        try:
 
-            await interaction.response.send_message(
+            if not interaction.response.is_done():
+
+                await interaction.response.defer(
+                    ephemeral=True
+                )
+
+        except discord.HTTPException as e:
+
+            print(
+                f"❌ /rolepanel_delete deferエラー: {e}",
+                flush=True
+            )
+
+            return
+
+        # ========================================
+        # Guild
+        # ========================================
+
+        guild = interaction.guild
+
+        if guild is None:
+
+            await interaction.followup.send(
                 "❌ サーバー内で使用してください。",
                 ephemeral=True
             )
@@ -979,12 +1098,12 @@ class RolePanel(commands.Cog):
             return
 
         # ========================================
-        # PostgreSQL確認
+        # PostgreSQL
         # ========================================
 
         if not hasattr(self.bot, "pool"):
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ PostgreSQLに接続されていません。",
                 ephemeral=True
             )
@@ -1003,22 +1122,14 @@ class RolePanel(commands.Cog):
                 WHERE guild_id = $1
                   AND channel_id = $2
                 """,
-                int(interaction.guild.id),
-                int(interaction.channel.id)
+                guild.id,
+                interaction.channel.id
             )
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "🗑️ このチャンネルのロールパネル情報を削除しました。\n"
                 f"`{result}`",
                 ephemeral=True
-            )
-
-            print(
-                f"🗑️ ロールパネルDB削除: "
-                f"guild={interaction.guild.id}, "
-                f"channel={interaction.channel.id}, "
-                f"result={result}",
-                flush=True
             )
 
         except Exception as e:
@@ -1028,7 +1139,7 @@ class RolePanel(commands.Cog):
                 flush=True
             )
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ ロールパネル情報の削除に失敗しました。",
                 ephemeral=True
             )
@@ -1066,16 +1177,16 @@ class RolePanel(commands.Cog):
 
         try:
 
-            if not interaction.response.is_done():
+            if interaction.response.is_done():
 
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     message,
                     ephemeral=True
                 )
 
             else:
 
-                await interaction.followup.send(
+                await interaction.response.send_message(
                     message,
                     ephemeral=True
                 )
@@ -1083,7 +1194,7 @@ class RolePanel(commands.Cog):
         except Exception as e:
 
             print(
-                f"❌ エラーメッセージ送信失敗: {e}",
+                f"❌ /rolepanelエラー通知失敗: {e}",
                 flush=True
             )
 
@@ -1120,16 +1231,16 @@ class RolePanel(commands.Cog):
 
         try:
 
-            if not interaction.response.is_done():
+            if interaction.response.is_done():
 
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     message,
                     ephemeral=True
                 )
 
             else:
 
-                await interaction.followup.send(
+                await interaction.response.send_message(
                     message,
                     ephemeral=True
                 )
@@ -1137,7 +1248,7 @@ class RolePanel(commands.Cog):
         except Exception as e:
 
             print(
-                f"❌ エラーメッセージ送信失敗: {e}",
+                f"❌ /rolepanel_deleteエラー通知失敗: {e}",
                 flush=True
             )
 
