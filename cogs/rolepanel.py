@@ -80,16 +80,22 @@ class RolePanel(commands.Cog):
       title="パネルのタイトル（埋め込み用）",
       description="パネルの説明文（埋め込み用）",
   )
-  @app_commands.checks.has_permissions(administrator=True)
   async def rolepanel_set(
       self,
       interaction: discord.Interaction,
       channel: discord.TextChannel,
       role: discord.Role,
       title: str = "ロールパネル",
-      description: "下のボタンを押してロールを取得・解除してください。",
+      description: str = "下のボタンを押してロールを取得・解除してください。",
   ):
     if not interaction.guild:
+      return
+
+    # 管理者権限チェック
+    if not interaction.permissions.administrator:
+      await interaction.response.send_message(
+          "❌ このコマンドを実行するには管理者権限が必要です。", ephemeral=True
+      )
       return
 
     # ボットがそのロールを付与できる権限があるかチェック
