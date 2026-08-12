@@ -664,8 +664,6 @@ class RolePanel(commands.Cog):
 
         description = (
             "取得したいロールのボタンを押してください。\n\n"
-            "🟢 ボタンを押す → ロール取得\n"
-            "🔴 もう一度押す → ロール解除\n\n"
         )
 
         for role in roles:
@@ -675,13 +673,13 @@ class RolePanel(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="🎭 ロールパネル",
+            title=" ロールパネル",
             description=description,
             color=discord.Color.blurple()
         )
 
         embed.set_footer(
-            text="ボタンを押すことでロールを取得・解除できます。"
+            text="ボタンを押すことでロールを取得できます。"
         )
 
         # ========================================
