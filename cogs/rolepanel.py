@@ -3,14 +3,12 @@ from discord import app_commands
 from discord.ext import commands
 
 
-# ボタンのビュー（永続的、またはBot起動中有効）
+# ボタンのビュー（ボット起動中有効）
 class RoleButtonView(discord.ui.View):
 
   def __init__(self, role_id: int):
     super().__init__(timeout=None)
     self.role_id = role_id
-
-    # 動的にボタンを生成（カスタムIDにロールIDを埋め込む）
     self.add_item(RoleToggleButton(role_id))
 
 
@@ -39,7 +37,7 @@ class RoleToggleButton(discord.ui.Button):
       )
       return
 
-    # 権限チェック（ボットにロール管理権限があるか）
+    # 権限チェック（ボットの役職が対象ロールより上にあるか）
     if guild.me.top_role <= role:
       await interaction.response.send_message(
           "❌ ボットの権限不足によりロールを付与できません。ボットのロールを対象ロールより上に配置してください。",
