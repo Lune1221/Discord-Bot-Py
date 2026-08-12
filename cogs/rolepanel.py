@@ -42,6 +42,217 @@ class RoleButton(discord.ui.Button):
     ):
 
         # ========================================
+        # まずInteractionを即座にACK
+        # ========================================
+
+        try:
+            await interaction.response.defer(
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            print(
+                f"❌ Interaction defer エラー: {e}",
+                flush=True
+            )
+            return
+
+        # ========================================
+        # サーバー確認
+        # ========================================
+
+        if interaction.guild is None:
+
+            await interaction.followup.send(
+                "❌ サーバー内で使用してください。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # Member取得
+        # ========================================
+
+        member = interaction.guild.get_member(
+            interaction.user.id
+        )
+
+        if member is None:
+
+            try:
+                member = await interaction.guild.fetch_member(
+                    interaction.user.id
+                )
+            except discord.HTTPException:
+
+                await interaction.followup.send(
+                    "❌ ユーザー情報を取得できませんでした。",
+                    ephemeral=True
+                )
+
+                return
+
+        # ========================================
+        # ロール取得
+        # ========================================
+
+        role = interaction.guild.get_role(
+            self.role_id
+        )
+
+        if role is None:
+
+            await interaction.followup.send(
+                "❌ このロールは存在しません。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # Bot取得
+        # ========================================
+
+        bot_member = interaction.guild.me
+
+        if bot_member is None:
+
+            await interaction.followup.send(
+                "❌ Bot情報を取得できませんでした。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # @everyone
+        # ========================================
+
+        if role.is_default():
+
+            await interaction.followup.send(
+                "❌ @everyone ロールは操作できません。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # 管理ロール・Botより上のロール確認
+        # ========================================
+
+        if role >= bot_member.top_role:
+
+            await interaction.followup.send(
+                "❌ このロールはBotが操作できません。\n"
+                "Botのロールを対象ロールより上に移動してください。",
+                ephemeral=True
+            )
+
+            return
+
+        # ========================================
+        # ロール操作
+        # ========================================
+
+        try:
+
+            # ----------------------------------------
+            # 持っている → 解除
+            # ----------------------------------------
+
+            if role in member.roles:
+
+                await member.remove_roles(
+                    role,
+                    reason="ロールパネルから解除"
+                )
+
+                await interaction.followup.send(
+                    f"🔴 **{role.name}** を解除しました。",
+                    ephemeral=True
+                )
+
+            # ----------------------------------------
+            # 持っていない → 取得
+            # ----------------------------------------
+
+            else:
+
+                await member.add_roles(
+                    role,
+                    reason="ロールパネルから取得"
+                )
+
+                await interaction.followup.send(
+                    f"🟢 **{role.name}** を取得しました。",
+                    ephemeral=True
+                )
+
+        # ========================================
+        # 権限エラー
+        # ========================================
+
+        except discord.Forbidden:
+
+            await interaction.followup.send(
+                "❌ Botにロールを操作する権限がありません。\n"
+                "Botのロールが対象ロールより上にあることを確認してください。",
+                ephemeral=True
+            )
+
+        # ========================================
+        # Discord APIエラー
+        # ========================================
+
+        except discord.HTTPException as e:
+
+            print(
+                f"❌ Discord APIエラー: {e}",
+                flush=True
+            )
+
+            try:
+
+                await interaction.followup.send(
+                    "❌ Discord APIでエラーが発生しました。",
+                    ephemeral=True
+                )
+
+            except discord.HTTPException as followup_error:
+
+                print(
+                    f"❌ エラー通知にも失敗しました: {followup_error}",
+                    flush=True
+                )
+
+        # ========================================
+        # その他のエラー
+        # ========================================
+
+        except Exception as e:
+
+            print(
+                f"❌ ロール操作エラー: {e}",
+                flush=True
+            )
+
+            try:
+
+                await interaction.followup.send(
+                    "❌ ロール操作中にエラーが発生しました。",
+                    ephemeral=True
+                )
+
+            except discord.HTTPException as followup_error:
+
+                print(
+                    f"❌ エラー通知にも失敗しました: {followup_error}",
+                    flush=True
+                )
+
+
+        # ========================================
         # サーバー確認
         # ========================================
 
