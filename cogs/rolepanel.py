@@ -205,7 +205,7 @@ class RoleButton(discord.ui.Button):
                 )
 
                 await interaction.followup.send(
-                    f"🔴 **{role.name}** を解除しました。",
+                    f" **{role.name}** を解除しました。",
                     ephemeral=True
                 )
 
@@ -221,7 +221,7 @@ class RoleButton(discord.ui.Button):
                 )
 
                 await interaction.followup.send(
-                    f"🟢 **{role.name}** を取得しました。",
+                    f" **{role.name}** を取得しました。",
                     ephemeral=True
                 )
 
