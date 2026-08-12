@@ -276,7 +276,7 @@ class RoleButton(discord.ui.Button):
                 )
 
                 print(
-                    f"🔴 ロール解除: "
+                    f"ロール解除: "
                     f"user={member.id}, "
                     f"role={role.id}",
                     flush=True
@@ -285,7 +285,7 @@ class RoleButton(discord.ui.Button):
                 try:
 
                     await interaction.followup.send(
-                        f"🔴 **{role.name}** を解除しました。",
+                        f"**{role.name}** を解除しました。",
                         ephemeral=True
                     )
 
@@ -309,7 +309,7 @@ class RoleButton(discord.ui.Button):
                 )
 
                 print(
-                    f"🟢 ロール取得: "
+                    f"ロール取得: "
                     f"user={member.id}, "
                     f"role={role.id}",
                     flush=True
@@ -318,7 +318,7 @@ class RoleButton(discord.ui.Button):
                 try:
 
                     await interaction.followup.send(
-                        f"🟢 **{role.name}** を取得しました。",
+                        f"**{role.name}** を取得しました。",
                         ephemeral=True
                     )
 
@@ -829,13 +829,13 @@ class RolePanel(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="🎭 ロールパネル",
+            title="ロールパネル",
             description=description,
             color=discord.Color.blurple()
         )
 
         embed.set_footer(
-            text="ボタンを押すことでロールを取得・解除できます。"
+            text="ボタンを押すことでロールを取得できます。"
         )
 
         # ========================================
