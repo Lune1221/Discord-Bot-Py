@@ -79,7 +79,8 @@ async def on_ready():
                 bot.pool = await asyncpg.create_pool(
                     database_url,
                     min_size=1,
-                    max_size=5
+                    max_size=5,
+                    statement_cache_size=0
                 )
 
                 print(
