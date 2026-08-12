@@ -71,12 +71,6 @@ class Events(commands.Cog):
         )
     )
 
-    try:
-      await self.bot.tree.sync()
-      print("✨ スラッシュコマンド登録完了")
-    except Exception as e:
-      print("コマンド登録エラー:", e)
-
   # 3. メッセージ作成・荒らし対策・レベルアップ・スティッキー
   @commands.Cog.listener()
   async def on_message(self, message: discord.Message):
