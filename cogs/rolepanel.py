@@ -304,7 +304,7 @@ class RoleButton(discord.ui.Button):
                 )
 
                 print(
-                    f"🔴 ロール解除成功: "
+                    f" ロール解除成功: "
                     f"user={member.id}, "
                     f"role={role.name} ({role.id})",
                     flush=True
@@ -312,7 +312,7 @@ class RoleButton(discord.ui.Button):
 
                 await self._followup(
                     interaction,
-                    f"🔴 **{role.name}** を解除しました。"
+                    f" **{role.name}** を解除しました。"
                 )
 
             # ====================================
@@ -327,7 +327,7 @@ class RoleButton(discord.ui.Button):
                 )
 
                 print(
-                    f"🟢 ロール取得成功: "
+                    f" ロール取得成功: "
                     f"user={member.id}, "
                     f"role={role.name} ({role.id})",
                     flush=True
@@ -335,7 +335,7 @@ class RoleButton(discord.ui.Button):
 
                 await self._followup(
                     interaction,
-                    f"🟢 **{role.name}** を取得しました。"
+                    f" **{role.name}** を取得しました。"
                 )
 
         # ========================================
@@ -795,8 +795,6 @@ class RolePanel(commands.Cog):
 
         description = (
             "取得したいロールのボタンを押してください。\n\n"
-            "ボタンを押すとロールを取得できます。\n"
-            "もう一度押すとロールを解除できます。\n\n"
         )
 
         for role in roles:
@@ -806,13 +804,13 @@ class RolePanel(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="🎭 ロールパネル",
+            title="ロールパネル",
             description=description,
             color=discord.Color.blurple()
         )
 
         embed.set_footer(
-            text="ボタンを押すことでロールを取得・解除できます。"
+            text="ボタンを押すことでロールを取得できます。"
         )
 
         # ========================================
