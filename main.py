@@ -1,16 +1,20 @@
 import logging
 import os
 import threading
+
 import asyncpg
 import discord
 from discord.ext import commands
 from flask import Flask
 
-# Flaskの開発サーバー警告とアクセスログを非表示にする
+
+# ========================================
+# Flask
+# ========================================
+
 log = logging.getLogger("werkzeug")
 log.setLevel(logging.ERROR)
 
-# --- 1. Flaskサーバーの準備 ---
 app = Flask(__name__)
 
 
@@ -21,14 +25,23 @@ def home():
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
 
 
-# --- 2. Discordボットの準備 ---
+# ========================================
+# Discord Bot
+# ========================================
+
 intents = discord.Intents.default()
+
 intents.message_content = True
 intents.voice_states = True
 intents.members = True
+
 
 bot = commands.Bot(
     command_prefix="!",
@@ -36,10 +49,16 @@ bot = commands.Bot(
 )
 
 
+# ========================================
+# Bot Ready
+# ========================================
+
 @bot.event
 async def on_ready():
+
     print(
-        f"=== ログイン成功: {bot.user.name} (ID: {bot.user.id}) ===",
+        f"=== ログイン成功: {bot.user.name} "
+        f"(ID: {bot.user.id}) ===",
         flush=True
     )
 
@@ -48,31 +67,42 @@ async def on_ready():
     # ========================================
 
     if not hasattr(bot, "pool"):
-        database_url = os.environ.get("DATABASE_URL")
+
+        database_url = os.environ.get(
+            "DATABASE_URL"
+        )
 
         if database_url:
+
             try:
-                bot.pool = await asyncpg.create_pool(database_url)
+
+                bot.pool = await asyncpg.create_pool(
+                    database_url,
+                    min_size=1,
+                    max_size=5
+                )
 
                 print(
-                    "✅ データベース（PostgreSQL）への接続に成功しました！",
+                    "✅ PostgreSQLへの接続に成功しました！",
                     flush=True
                 )
 
             except Exception as e:
+
                 print(
-                    f"❌ 【データベース接続失敗】 エラー詳細: {e}",
+                    f"❌ PostgreSQL接続失敗: {e}",
                     flush=True
                 )
 
         else:
+
             print(
-                "⚠️ 【警告】DATABASE_URL が環境変数に設定されていません。",
+                "⚠️ DATABASE_URL が設定されていません。",
                 flush=True
             )
 
     # ========================================
-    # Cogs読み込み
+    # Cogs
     # ========================================
 
     if os.path.exists("./cogs"):
@@ -87,45 +117,55 @@ async def on_ready():
 
             cog_name = f"cogs.{filename[:-3]}"
 
-            # 既に読み込まれている場合はスキップ
+            # 既に読み込まれているCogはスキップ
             if cog_name in bot.extensions:
                 continue
 
             try:
-                await bot.load_extension(cog_name)
+
+                await bot.load_extension(
+                    cog_name
+                )
 
                 print(
-                    f"読み込み成功: {cog_name}",
+                    f"✅ Cog読み込み成功: {cog_name}",
                     flush=True
                 )
 
             except Exception as e:
+
                 print(
-                    f"【読み込み失敗】 {cog_name}: {e}",
+                    f"❌ Cog読み込み失敗: "
+                    f"{cog_name}: {e}",
                     flush=True
                 )
 
     # ========================================
-    # スラッシュコマンド同期
+    # Slash Commands
     # ========================================
 
     try:
+
         synced = await bot.tree.sync()
 
         print(
-            f"🌟 スラッシュコマンドの同期に成功しました"
-            f"（合計 {len(synced)} 個）",
+            f"🌟 スラッシュコマンド同期成功 "
+            f"({len(synced)}個)",
             flush=True
         )
 
     except Exception as e:
+
         print(
-            f"【同期失敗】エラー詳細: {e}",
+            f"❌ スラッシュコマンド同期失敗: {e}",
             flush=True
         )
 
 
-# --- 3. メイン起動処理 ---
+# ========================================
+# Main
+# ========================================
+
 if __name__ == "__main__":
 
     print(
@@ -133,7 +173,7 @@ if __name__ == "__main__":
         flush=True
     )
 
-    # Flaskを別スレッドでバックグラウンド起動
+    # Flask
     flask_thread = threading.Thread(
         target=run_flask,
         daemon=True
@@ -146,31 +186,33 @@ if __name__ == "__main__":
         flush=True
     )
 
-    # トークンの確認と起動
-    token = os.environ.get("DISCORD_TOKEN")
+    # Discord Token
+    token = os.environ.get(
+        "DISCORD_TOKEN"
+    )
 
     if not token:
 
         print(
-            "【エラー】DISCORD_TOKEN が環境変数に設定されていません！",
+            "❌ DISCORD_TOKEN が設定されていません！",
             flush=True
         )
 
     else:
 
         print(
-            f"DISCORD_TOKEN を取得しました"
-            f"（文字数: {len(token)}）。"
-            f"ボットを起動します...",
+            f"DISCORD_TOKENを取得しました "
+            f"(文字数: {len(token)})",
             flush=True
         )
 
         try:
+
             bot.run(token)
 
         except Exception as e:
 
             print(
-                f"ボットの起動中にエラーが発生しました: {e}",
+                f"❌ Bot起動エラー: {e}",
                 flush=True
             )
