@@ -1,131 +1,254 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 
 
-# ボタンのビュー（ボット起動中有効）
-class RoleButtonView(discord.ui.View):
+# ========================================
+# ロールパネル設定
+# ========================================
 
-  def __init__(self, role_id: int):
-    super().__init__(timeout=None)
-    self.role_id = role_id
-    self.add_item(RoleToggleButton(role_id))
+ROLES = {
+    123456789012345678: {
+        "name": "お知らせ",
+        "emoji": "📢",
+        "style": discord.ButtonStyle.primary,
+    },
+
+    234567890123456789: {
+        "name": "ゲーム",
+        "emoji": "🎮",
+        "style": discord.ButtonStyle.success,
+    },
+
+    345678901234567890: {
+        "name": "イベント",
+        "emoji": "🎉",
+        "style": discord.ButtonStyle.danger,
+    },
+}
 
 
-class RoleToggleButton(discord.ui.Button):
+# ========================================
+# ロールボタン
+# ========================================
 
-  def __init__(self, role_id: int):
-    super().__init__(
-        style=discord.ButtonStyle.primary,
-        label="ロールを受け取る / 外す",
-        custom_id=f"role_panel_{role_id}",
-    )
-    self.role_id = role_id
+class RoleButton(discord.ui.Button):
 
-  async def callback(self, interaction: discord.Interaction):
-    guild = interaction.guild
-    member = interaction.user
-
-    if not guild:
-      return
-
-    role = guild.get_role(self.role_id)
-    if not role:
-      await interaction.response.send_message(
-          "❌ 対象のロールが見つかりませんでした（削除された可能性があります）。",
-          ephemeral=True,
-      )
-      return
-
-    # 権限チェック（ボットの役職が対象ロールより上にあるか）
-    if guild.me.top_role <= role:
-      await interaction.response.send_message(
-          "❌ ボットの権限不足によりロールを付与できません。ボットのロールを対象ロールより上に配置してください。",
-          ephemeral=True,
-      )
-      return
-
-    try:
-      if role in member.roles:
-        await member.remove_roles(role)
-        await interaction.response.send_message(
-            f"🔄 ロール **{role.name}** を外しました。", ephemeral=True
+    def __init__(
+        self,
+        role_id: int,
+        name: str,
+        emoji: str,
+        style: discord.ButtonStyle
+    ):
+        super().__init__(
+            label=name,
+            emoji=emoji,
+            style=style,
+            custom_id=f"role_panel:{role_id}"
         )
-      else:
-        await member.add_roles(role)
-        await interaction.response.send_message(
-            f"✅ ロール **{role.name}** を付与しました！", ephemeral=True
-        )
-    except Exception as e:
-      await interaction.response.send_message(
-          f"❌ エラーが発生しました: {e}", ephemeral=True
-      )
 
+        self.role_id = role_id
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        # サーバー以外では使用不可
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "❌ サーバー内で使用してください。",
+                ephemeral=True
+            )
+            return
+
+        # ロール取得
+        role = interaction.guild.get_role(self.role_id)
+
+        if role is None:
+            await interaction.response.send_message(
+                "❌ 設定されたロールが存在しません。",
+                ephemeral=True
+            )
+            return
+
+        # メンバー取得
+        member = interaction.user
+
+        # Botのロールより上なら操作不可
+        if role >= interaction.guild.me.top_role:
+            await interaction.response.send_message(
+                "❌ このロールはBotが操作できません。\n"
+                "Botのロールを対象ロールより上に移動してください。",
+                ephemeral=True
+            )
+            return
+
+        try:
+
+            # ========================================
+            # ロールを持っている → 解除
+            # ========================================
+
+            if role in member.roles:
+
+                await member.remove_roles(role)
+
+                await interaction.response.send_message(
+                    f"🔴 **{role.name}** のロールを解除しました。",
+                    ephemeral=True
+                )
+
+            # ========================================
+            # ロールを持っていない → 付与
+            # ========================================
+
+            else:
+
+                await member.add_roles(role)
+
+                await interaction.response.send_message(
+                    f"🟢 **{role.name}** のロールを取得しました。",
+                    ephemeral=True
+                )
+
+        except discord.Forbidden:
+
+            await interaction.response.send_message(
+                "❌ Botにロールを操作する権限がありません。",
+                ephemeral=True
+            )
+
+        except Exception as e:
+
+            print(
+                f"ロール操作エラー: {e}",
+                flush=True
+            )
+
+            await interaction.response.send_message(
+                "❌ ロールの操作中にエラーが発生しました。",
+                ephemeral=True
+            )
+
+
+# ========================================
+# ロールパネルView
+# ========================================
+
+class RolePanelView(discord.ui.View):
+
+    def __init__(self):
+
+        # timeout=None = 永続View
+        super().__init__(timeout=None)
+
+        for role_id, config in ROLES.items():
+
+            self.add_item(
+                RoleButton(
+                    role_id=role_id,
+                    name=config["name"],
+                    emoji=config["emoji"],
+                    style=config["style"]
+                )
+            )
+
+
+# ========================================
+# Cog
+# ========================================
 
 class RolePanel(commands.Cog):
 
-  def __init__(self, bot):
-    self.bot = bot
+    def __init__(self, bot: commands.Bot):
 
-  panel_group = app_commands.Group(
-      name="rolepanel", description="ロールパネルを管理します"
-  )
+        self.bot = bot
 
-  @panel_group.command(
-      name="set", description="ボタン式のロール付与パネルを設置します"
-  )
-  @app_commands.describe(
-      channel="パネルを送信するチャンネル",
-      role="付与・剥奪するロール",
-      title="パネルのタイトル（埋め込み用）",
-      description="パネルの説明文（埋め込み用）",
-  )
-  async def rolepanel_set(
-      self,
-      interaction: discord.Interaction,
-      channel: discord.TextChannel,
-      role: discord.Role,
-      title: str = "ロールパネル",
-      description: str = "下のボタンを押してロールを取得・解除してください。",
-  ):
-    if not interaction.guild:
-      return
+        # Bot再起動後も既存ボタンを動かす
+        self.bot.add_view(RolePanelView())
 
-    # 管理者権限チェック
-    if not interaction.permissions.administrator:
-      await interaction.response.send_message(
-          "❌ このコマンドを実行するには管理者権限が必要です。", ephemeral=True
-      )
-      return
+    # ========================================
+    # /rolepanel
+    # ========================================
 
-    # ボットがそのロールを付与できる権限があるかチェック
-    if interaction.guild.me.top_role <= role:
-      await interaction.response.send_message(
-          "❌ ボットの役職が指定したロールよりも下にあるため、このロールを管理できません。",
-          ephemeral=True,
-      )
-      return
-
-    # パネル用Embedの作成
-    embed = discord.Embed(
-        title=title, description=description, color=discord.Color.blue()
+    @app_commands.command(
+        name="rolepanel",
+        description="ロール取得パネルを設置します"
     )
-    embed.set_footer(text=f"対象ロール: {role.name}")
+    @app_commands.checks.has_permissions(
+        administrator=True
+    )
+    async def rolepanel(
+        self,
+        interaction: discord.Interaction
+    ):
 
-    # ボタンViewの作成
-    view = RoleButtonView(role.id)
+        embed = discord.Embed(
+            title="🎭 ロールパネル",
+            description=(
+                "取得したいロールのボタンを押してください。\n\n"
+                "🟢 ボタンを押す → ロール取得\n"
+                "🔴 もう一度押す → ロール解除"
+            ),
+            color=discord.Color.blurple()
+        )
 
-    try:
-      # 指定チャンネルにパネルを送信
-      await channel.send(embed=embed, view=view)
-      await interaction.response.send_message(
-          f"✨ {channel.mention} にロールパネルを設置しました！", ephemeral=True
-      )
-    except Exception as e:
-      await interaction.response.send_message(
-          f"❌ パネルの送信に失敗しました: {e}", ephemeral=True
-      )
+        embed.set_footer(
+            text="ロールはいつでも変更できます。"
+        )
+
+        await interaction.channel.send(
+            embed=embed,
+            view=RolePanelView()
+        )
+
+        await interaction.response.send_message(
+            "✅ ロールパネルを設置しました。",
+            ephemeral=True
+        )
+
+    # ========================================
+    # 権限エラー
+    # ========================================
+
+    @rolepanel.error
+    async def rolepanel_error(
+        self,
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError
+    ):
+
+        if isinstance(
+            error,
+            app_commands.errors.MissingPermissions
+        ):
+
+            await interaction.response.send_message(
+                "❌ このコマンドは管理者のみ使用できます。",
+                ephemeral=True
+            )
+
+        else:
+
+            print(
+                f"/rolepanel エラー: {error}",
+                flush=True
+            )
+
+            await interaction.response.send_message(
+                "❌ コマンドの実行中にエラーが発生しました。",
+                ephemeral=True
+            )
 
 
-async def setup(bot):
-  await bot.add_cog(RolePanel(bot))
+# ========================================
+# Cog読み込み
+# ========================================
+
+async def setup(bot: commands.Bot):
+
+    await bot.add_cog(
+        RolePanel(bot)
+    )
