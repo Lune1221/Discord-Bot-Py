@@ -12,13 +12,14 @@ class MessagePurge(commands.Cog):
   @app_commands.command(
       name="purge",
       description=(
-          "指定した期間（24時間〜1年）のメッセージを一括削除します"
+          "指定した期間のメッセージを一括削除します（ユーザー名・ID指定可）"
       ),
   )
   @app_commands.describe(
       period="削除する期間を選択してください",
-      target_user=(
-          "（任意）特定の人に絞る場合、そのユーザーを指定できます"
+      target_user="（任意）Discordメンバーとして選択する場合",
+      target_query=(
+          "（任意）垢消しなどで選べない場合、ユーザー名やユーザーID(数字)を入力"
       ),
   )
   @app_commands.choices(
@@ -36,6 +37,7 @@ class MessagePurge(commands.Cog):
       interaction: discord.Interaction,
       period: str,
       target_user: discord.Member | None = None,
+      target_query: str | None = None,
   ):
     await interaction.response.defer(ephemeral=True)
 
@@ -77,11 +79,23 @@ class MessagePurge(commands.Cog):
     failed_count = 0
 
     try:
-      # Discordの仕様上、14日以上前のメッセージは一括削除(purge)が使えないため、個別に削除します
       async for message in channel.history(limit=None, after=time_limit):
-        # ターゲットユーザーが指定されている場合は、その人のメッセージだけにする
-        if target_user and message.author.id != target_user.id:
+        author = message.author
+
+        # 絞り込み判定
+        if target_user and author.id != target_user.id:
           continue
+
+        if target_query:
+          # 入力された文字列が「ユーザーID(完全一致)」「ユーザー名(部分一致)」「表示名(部分一致)」のどれかにヒットするか
+          query = target_query.strip()
+          is_id_match = query.isdigit() and author.id == int(query)
+          is_name_match = (
+              query.lower() in author.name.lower()
+              or query in author.display_name
+          )
+          if not (is_id_match or is_name_match):
+            continue
 
         try:
           await message.delete()
@@ -94,14 +108,18 @@ class MessagePurge(commands.Cog):
       )
       return
 
-    target_text = (
-        f"（対象ユーザー: {target_user.mention}）" if target_user else ""
-    )
+    # ログ表示用の説明文作成
+    filter_info = ""
+    if target_user:
+      filter_info = f"（対象メンバー: {target_user.mention}）"
+    elif target_query:
+      filter_info = f"（検索クエリ: `{target_query}`）"
+
     await interaction.followup.send(
         f"✅ 削除が完了しました！\n"
-        f"・期間: 過去の `{period_name}` {target_text}\n"
+        f"・期間: 過去の `{period_name}` {filter_info}\n"
         f"・削除成功: `{deleted_count}件`\n"
-        f"・削除失敗（権限不足など）: `{failed_count}件`",
+        f"・削除失敗: `{failed_count}件`",
         ephemeral=True,
     )
 
