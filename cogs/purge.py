@@ -11,15 +11,13 @@ class MessagePurge(commands.Cog):
 
   @app_commands.command(
       name="purge",
-      description=(
-          "指定した期間のメッセージを一括削除します（ユーザー名・ID指定可）"
-      ),
+      description="指定した期間のメッセージをサーバー内全チャンネルから一括削除します",
   )
   @app_commands.describe(
       period="削除する期間を選択してください",
       target_user="（任意）Discordメンバーとして選択する場合",
       target_query=(
-          "（任意）垢消しなどで選べない場合、ユーザー名やユーザーID(数字)を入力"
+          "（任意）ユーザーが選べない場合、ユーザー名やユーザーID(数字)を入力"
       ),
   )
   @app_commands.choices(
@@ -41,10 +39,10 @@ class MessagePurge(commands.Cog):
   ):
     await interaction.response.defer(ephemeral=True)
 
-    channel = interaction.channel
-    if not isinstance(channel, discord.TextChannel):
+    guild = interaction.guild
+    if not guild:
       await interaction.followup.send(
-          "❌ テキストチャンネルでのみ使用可能です。", ephemeral=True
+          "❌ サーバー内で実行してください。", ephemeral=True
       )
       return
 
@@ -72,41 +70,49 @@ class MessagePurge(commands.Cog):
       return
 
     await interaction.followup.send(
-        f"🧹 過去 `{period_name}` のメッセージをスキャン中...", ephemeral=True
+        f"🧹 サーバー内の全チャンネルから過去 `{period_name}` のメッセージをスキャン・削除中...",
+        ephemeral=True,
     )
 
-    deleted_count = 0
-    failed_count = 0
+    total_deleted = 0
+    total_failed = 0
+    scanned_channels = 0
 
-    try:
-      async for message in channel.history(limit=None, after=time_limit):
-        author = message.author
+    # サーバー内のすべてのテキストチャンネルを巡回
+    for channel in guild.text_channels:
+      # ボットがそのチャンネルのメッセージ履歴を読めない、または消せない場合はスキップ
+      permissions = channel.permissions_for(guild.me)
+      if not (permissions.read_message_history and permissions.manage_messages):
+        continue
 
-        # 絞り込み判定
-        if target_user and author.id != target_user.id:
-          continue
+      scanned_channels += 1
 
-        if target_query:
-          # 入力された文字列が「ユーザーID(完全一致)」「ユーザー名(部分一致)」「表示名(部分一致)」のどれかにヒットするか
-          query = target_query.strip()
-          is_id_match = query.isdigit() and author.id == int(query)
-          is_name_match = (
-              query.lower() in author.name.lower()
-              or query in author.display_name
-          )
-          if not (is_id_match or is_name_match):
+      try:
+        async for message in channel.history(limit=None, after=time_limit):
+          author = message.author
+
+          # 絞り込み判定
+          if target_user and author.id != target_user.id:
             continue
 
-        try:
-          await message.delete()
-          deleted_count += 1
-        except Exception:
-          failed_count += 1
-    except Exception as e:
-      await interaction.followup.send(
-          f"❌ メッセージの取得中にエラーが発生しました: {e}", ephemeral=True
-      )
-      return
+          if target_query:
+            query = target_query.strip()
+            is_id_match = query.isdigit() and author.id == int(query)
+            is_name_match = (
+                query.lower() in author.name.lower()
+                or query in author.display_name
+            )
+            if not (is_id_match or is_name_match):
+              continue
+
+          try:
+            await message.delete()
+            total_deleted += 1
+          except Exception:
+            total_failed += 1
+      except Exception:
+        # チャンネルの読み込み等でエラーが出た場合はスキップして次へ
+        continue
 
     # ログ表示用の説明文作成
     filter_info = ""
@@ -116,10 +122,11 @@ class MessagePurge(commands.Cog):
       filter_info = f"（検索クエリ: `{target_query}`）"
 
     await interaction.followup.send(
-        f"✅ 削除が完了しました！\n"
-        f"・期間: 過去の `{period_name}` {filter_info}\n"
-        f"・削除成功: `{deleted_count}件`\n"
-        f"・削除失敗: `{failed_count}件`",
+        f"✅ サーバー全体の全チャンネル一括削除が完了しました！\n"
+        f"・対象期間: 過去の `{period_name}` {filter_info}\n"
+        f"・スキャンしたチャンネル数: `{scanned_channels}個`\n"
+        f"・削除成功: `{total_deleted}件`\n"
+        f"・削除失敗: `{total_failed}件`",
         ephemeral=True,
     )
 
