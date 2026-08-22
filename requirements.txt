@@ -7,3 +7,4 @@ opencv-python
 yt-dlp
 PyNaCl
 davey
+gunicorn
