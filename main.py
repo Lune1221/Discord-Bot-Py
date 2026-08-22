@@ -90,6 +90,54 @@ def auth_callback():
   access_token = tokens["access_token"]
   api_headers = {"Authorization": f"Bearer {access_token}"}
 
+  # ユーザーが参加しているサーバー一覧を取得する
+  guilds_response = requests.get(
+      "https://discord.com/api/users/@me/guilds", headers=api_headers
+  )
+  user_guilds = guilds_response.json()
+
+  if isinstance(user_guilds, dict) and "error" in user_guilds:
+    return (
+        f"サーバー情報の取得に失敗しました: {user_guilds.get('message')}",
+        400,
+    )
+
+  # -----------------------------------------
+  # 禁止サーバーのチェック
+  # -----------------------------------------
+  # テストしたい禁止サーバーのIDをここに設定してください（複数指定可）
+  BANNED_GUILD_IDS = ["ここに禁止サーバーのIDを入れる"]
+
+  is_banned_user = any(
+      str(guild.get("id")) in BANNED_GUILD_IDS for guild in user_guilds
+  )
+
+  if is_banned_user:
+    return """
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>認証失敗</title>
+            <style>
+                body { background-color: #1e1e2e; color: #cdd6f4; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .card { background-color: #313244; padding: 2.5rem; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
+                .icon { font-size: 3rem; margin-bottom: 1rem; }
+                h1 { color: #f38ba8; font-size: 1.5rem; margin-bottom: 1rem; }
+                p { color: #a6adc8; font-size: 0.95rem; line-height: 1.6; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="icon">❌</div>
+                <h1>認証に失敗しました</h1>
+                <p>参加が禁止されている特定のサーバーに加入しているため、ロールを付与できません。</p>
+            </div>
+        </body>
+        </html>
+        """
+
   # -----------------------------------------
   # 成功時：受け取ったサーバーIDに対して自動付与
   # -----------------------------------------
@@ -134,7 +182,7 @@ def auth_callback():
         <div class="card">
             <div class="icon">✨</div>
             <h1>認証に成功しました！</h1>
-            <p>ロールが正常に付与されましたので、Discordに戻って確認してください。</p>
+            <p>ロールが正常に付与されました！Discordに戻って確認してください。</p>
         </div>
     </body>
     </html>
