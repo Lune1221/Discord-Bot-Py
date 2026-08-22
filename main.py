@@ -106,7 +106,7 @@ def auth_callback():
   # 禁止サーバーのチェック
   # -----------------------------------------
   # テストしたい禁止サーバーのIDをここに設定してください（複数指定可）
-  BANNED_GUILD_IDS = ["1370813256624508938"]
+  BANNED_GUILD_IDS = ["1392780216241491968"]
 
   is_banned_user = any(
       str(guild.get("id")) in BANNED_GUILD_IDS for guild in user_guilds
