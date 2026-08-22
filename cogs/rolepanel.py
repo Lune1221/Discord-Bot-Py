@@ -204,7 +204,16 @@ class RolePanel(commands.Cog):
       )
       return
 
-    bot_member = guild.me
+    # ========================================
+    # Bot Member 取得（安全策）
+    # ========================================
+    bot_member = guild.get_member(self.bot.user.id)
+    if bot_member is None:
+      try:
+        bot_member = await guild.fetch_member(self.bot.user.id)
+      except Exception:
+        pass
+
     if bot_member is None:
       await interaction.followup.send(
           "❌ Bot情報を取得できませんでした。", ephemeral=True
@@ -303,9 +312,9 @@ class RolePanel(commands.Cog):
     except Exception as e:
       print(f"❌ パネル保存処理エラー: {e}", flush=True)
 
-    # ========================================
-    # /rolepanel_delete
-    # ========================================
+  # ========================================
+  # /rolepanel_delete
+  # ========================================
 
   @app_commands.command(
       name="rolepanel_delete",
