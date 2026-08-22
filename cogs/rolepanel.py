@@ -149,7 +149,7 @@ class RolePanel(commands.Cog):
   @app_commands.command(
       name="rolepanel",
       description=(
-          "外部認証を通ってロールを取得するためのパネルを作成します"
+          "ロールを取得するためのパネルを作成します"
       ),
   )
   @app_commands.describe(
@@ -230,12 +230,12 @@ class RolePanel(commands.Cog):
       )
       return
 
-    description = "下のボタンを押して外部認証を完了すると、ロールが取得できます。\n\n"
+    description = "下のボタンを押して認証を完了すると、ロールが取得できます。\n\n"
     for role in roles:
       description += f"・{role.mention}\n"
 
     embed = discord.Embed(
-        title="✨ 外部認証ロールパネル",
+        title="✨ 認証ロールパネル",
         description=description,
         color=discord.Color.blurple(),
     )
