@@ -205,7 +205,7 @@ class RolePanel(commands.Cog):
       return
 
     # ========================================
-    # Bot Member 取得（安全策）
+    # Bot Member 取得
     # ========================================
     bot_member = guild.get_member(self.bot.user.id)
     if bot_member is None:
@@ -226,7 +226,17 @@ class RolePanel(commands.Cog):
       )
       return
 
-    invalid_roles = [role for role in roles if role >= bot_member.top_role]
+    # Botの最高ロールが取得できない場合（ロール未付与など）への安全対策
+    bot_top_role = getattr(bot_member, "top_role", None)
+    if bot_top_role is None:
+      await interaction.followup.send(
+          "❌ Botの最高ロールが取得できませんでした。"
+          "Botにロールが割り当てられているか確認してください。",
+          ephemeral=True,
+      )
+      return
+
+    invalid_roles = [role for role in roles if role >= bot_top_role]
     if invalid_roles:
       names = "\n".join(f"・{role.mention}" for role in invalid_roles)
       await interaction.followup.send(
