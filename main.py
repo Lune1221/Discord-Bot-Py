@@ -1,4 +1,4 @@
-import logging
+Import logging
 import os
 import threading
 import urllib.parse
@@ -26,8 +26,6 @@ REDIRECT_URI = os.environ.get(
     "https://discord-bot-py-4mzn.onrender.com/auth/callback",
 )
 
-TARGET_GUILD_ID = "1392780216241491968"
-
 
 @app.route("/")
 def home():
@@ -39,15 +37,15 @@ def auth_login():
   if not CLIENT_ID or not REDIRECT_URI:
     return "Client ID または Redirect URI が設定されていません。", 500
 
-  # パネルから渡された role_id を取得して state に含める
-  role_id = request.args.get("role_id", "")
+  # パネルから渡された "guild_id_role_id" の形式の state を取得する
+  state = request.args.get("state", "")
 
   discord_login_url = (
       f"https://discord.com/oauth2/authorize?client_id={CLIENT_ID}"
       f"&response_type=code"
       f"&redirect_uri={urllib.parse.quote(REDIRECT_URI)}"
       f"&scope=guilds+identify"
-      f"&state={role_id}"
+      f"&state={state}"
   )
   return redirect(discord_login_url)
 
@@ -55,10 +53,19 @@ def auth_login():
 @app.route("/auth/callback")
 def auth_callback():
   code = request.args.get("code")
-  grant_role_id = request.args.get("state")  # stateからロールIDを受け取る
+  state = request.args.get("state", "")  # "guild_id:role_id" の形式で受け取る
 
   if not code:
     return "認証コードが取得できませんでした。", 400
+
+  # state から guild_id と role_id を安全に取り出す
+  grant_guild_id = None
+  grant_role_id = None
+  if "_" in state:
+    parts = state.split("_", 1)
+    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+      grant_guild_id = parts[0]
+      grant_role_id = parts[1]
 
   data = {
       "client_id": CLIENT_ID,
@@ -83,54 +90,10 @@ def auth_callback():
   access_token = tokens["access_token"]
   api_headers = {"Authorization": f"Bearer {access_token}"}
 
-  guilds_response = requests.get(
-      "https://discord.com/api/users/@me/guilds", headers=api_headers
-  )
-  user_guilds = guilds_response.json()
-
-  if isinstance(user_guilds, dict) and "error" in user_guilds:
-    return (
-        f"サーバー情報の取得に失敗しました: {user_guilds.get('message')}",
-        400,
-    )
-
-  is_in_target = any(
-      str(guild.get("id")) == TARGET_GUILD_ID for guild in user_guilds
-  )
-
   # -----------------------------------------
-  # 失敗時のデザイン画面（禁止サーバーにいる場合）
+  # 成功時：受け取ったサーバーIDに対して自動付与
   # -----------------------------------------
-  if is_in_target:
-    return """
-        <!DOCTYPE html>
-        <html lang="ja">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>認証失敗</title>
-            <style>
-                body { background-color: #1e1e2e; color: #cdd6f4; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .card { background-color: #313244; padding: 2.5rem; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
-                .icon { font-size: 3rem; margin-bottom: 1rem; }
-                h1 { color: #f38ba8; font-size: 1.5rem; margin-bottom: 1rem; }
-                p { color: #a6adc8; font-size: 0.95rem; line-height: 1.6; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <div class="icon">❌</div>
-                <h1>認証に失敗しました</h1>
-                <p>参加が禁止されている特定のサーバーに加入しているため、ロールを付与できません。</p>
-            </div>
-        </body>
-        </html>
-        """
-
-  # -----------------------------------------
-  # 成功時：ロールが指定されていれば自動付与
-  # -----------------------------------------
-  if grant_role_id and grant_role_id.isdigit():
+  if grant_guild_id and grant_role_id:
     user_info_response = requests.get(
         "https://discord.com/api/users/@me", headers=api_headers
     )
@@ -144,9 +107,7 @@ def auth_callback():
           "Content-Type": "application/json",
       }
 
-      GUILD_ID = TARGET_GUILD_ID
-
-      role_url = f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{user_id}/roles/{grant_role_id}"
+      role_url = f"https://discord.com/api/v10/guilds/{grant_guild_id}/members/{user_id}/roles/{grant_role_id}"
       role_res = requests.put(role_url, headers=role_headers)
       if role_res.status_code != 204:
         print(f"ロール付与失敗: {role_res.text}", flush=True)
@@ -173,7 +134,7 @@ def auth_callback():
         <div class="card">
             <div class="icon">✨</div>
             <h1>認証に成功しました！</h1>
-            <p>特定サーバーへの加入は確認されませんでした。<br>ロールが正常に付与されましたので、Discordに戻って確認してください。</p>
+            <p>ロールが正常に付与されましたので、Discordに戻って確認してください。</p>
         </div>
     </body>
     </html>
