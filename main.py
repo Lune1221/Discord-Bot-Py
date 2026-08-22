@@ -92,16 +92,67 @@ def auth_callback():
       str(guild.get("id")) == TARGET_GUILD_ID for guild in user_guilds
   )
 
+  # -----------------------------------------
+  # 失敗時のデザイン画面
+  # -----------------------------------------
   if is_in_target:
-    return (
-        "❌ 認証失敗: あなたは参加が禁止されている特定のサーバーに加入しているため、"
-        "認証を完了できません。"
-    )
+    return """
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>認証失敗</title>
+            <style>
+                body { background-color: #1e1e2e; color: #cdd6f4; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .card { background-color: #313244; padding: 2.5rem; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
+                .icon { font-size: 3rem; margin-bottom: 1rem; }
+                h1 { color: #f38ba8; font-size: 1.5rem; margin-bottom: 1rem; }
+                p { color: #a6adc8; font-size: 0.95rem; line-height: 1.6; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="icon">❌</div>
+                <h1>認証に失敗しました</h1>
+                <p>参加が禁止されている特定のサーバーに加入しているため、認証を完了できません。</p>
+            </div>
+        </body>
+        </html>
+        """
 
-  return (
-      "✨ 認証成功！禁止されている特定サーバーへの加入は確認されませんでした。"
-      "（ロール付与や次の処理へ進めます）"
-  )
+  # -----------------------------------------
+  # 成功時のデザイン画面
+  # -----------------------------------------
+  return """
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>認証完了</title>
+        <style>
+            body { background-color: #1e1e2e; color: #cdd6f4; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .card { background-color: #313244; padding: 2.5rem; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
+            .icon { font-size: 3rem; margin-bottom: 1rem; }
+            h1 { color: #a6e3a1; font-size: 1.5rem; margin-bottom: 1rem; }
+            p { color: #a6adc8; font-size: 0.95rem; line-height: 1.6; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="icon">✨</div>
+            <h1>認証に成功しました！</h1>
+            <p>特定サーバーへの加入は確認されませんでした。<br>Discordに戻って次の処理へ進んでください。</p>
+        </div>
+    </body>
+    </html>
+    """
+
+
+def run_flask():
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
 
 
 # ========================================
@@ -150,7 +201,6 @@ async def on_ready():
     print(f"❌ スラッシュコマンド同期失敗: {e}", flush=True)
 
 
-# Gunicornで起動されたときにもバックグラウンドでDiscord Botを動かすための処理
 def start_discord_bot():
   token = os.environ.get("DISCORD_TOKEN")
   if token:
@@ -160,5 +210,4 @@ def start_discord_bot():
       print(f"❌ Bot起動エラー: {e}", flush=True)
 
 
-# バックグラウンドスレッドでボットを起動
 threading.Thread(target=start_discord_bot, daemon=True).start()
