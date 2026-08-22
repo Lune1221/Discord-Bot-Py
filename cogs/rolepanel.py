@@ -16,10 +16,11 @@ ROLE_EMOJIS = ["1️⃣", "2️⃣", "3️⃣"]
 
 class RoleButton(discord.ui.Button):
 
-  def __init__(self, role_id: int, label: str, emoji: str):
-    # Renderの認証用エンドポイントへロールIDを渡すURLを生成
+  def __init__(self, guild_id: int, role_id: int, label: str, emoji: str):
+    # サーバーIDとロールIDを結合してstateに含める (例: 1392..._1507...)
+    state_value = f"{guild_id}_{role_id}"
     auth_url = (
-        f"https://discord-bot-py-4mzn.onrender.com/auth/login?role_id={role_id}"
+        f"https://discord-bot-py-4mzn.onrender.com/auth/login?state={state_value}"
     )
 
     super().__init__(
@@ -37,12 +38,16 @@ class RoleButton(discord.ui.Button):
 
 class RolePanelView(discord.ui.View):
 
-  def __init__(self, roles: list[tuple[int, str]]):
+  def __init__(self, guild_id: int, roles: list[tuple[int, str]]):
     super().__init__(timeout=None)  # 永続リンクボタンにするためタイムアウトなし
 
     for index, (role_id, role_name) in enumerate(roles):
       emoji = ROLE_EMOJIS[index] if index < len(ROLE_EMOJIS) else "🏷️"
-      self.add_item(RoleButton(role_id=role_id, label=role_name, emoji=emoji))
+      self.add_item(
+          RoleButton(
+              guild_id=guild_id, role_id=role_id, label=role_name, emoji=emoji
+          )
+      )
 
 
 # ========================================
@@ -55,18 +60,10 @@ class RolePanel(commands.Cog):
   def __init__(self, bot: commands.Bot):
     self.bot = bot
 
-  # ========================================
-  # Cog Load
-  # ========================================
-
   async def cog_load(self):
     if not hasattr(self.bot, "pool"):
       print("⚠️ rolepanel: PostgreSQLが利用できません。", flush=True)
       return
-
-    # ========================================
-    # DBテーブル作成
-    # ========================================
 
     try:
       await self.bot.pool.execute(
@@ -86,18 +83,10 @@ class RolePanel(commands.Cog):
       print(f"❌ role_panels テーブル作成エラー: {e}", flush=True)
       return
 
-    # ========================================
-    # パネル復元
-    # ========================================
-
     try:
       await self.restore_panels()
     except Exception as e:
       print(f"❌ ロールパネル復元エラー: {e}", flush=True)
-
-  # ========================================
-  # DBから復元
-  # ========================================
 
   async def restore_panels(self):
     rows = await self.bot.pool.fetch(
@@ -147,7 +136,7 @@ class RolePanel(commands.Cog):
         continue
 
       try:
-        view = RolePanelView(roles=roles)
+        view = RolePanelView(guild_id=guild.id, roles=roles)
         self.bot.add_view(view, message_id=row["message_id"])
         restored += 1
       except Exception as e:
@@ -156,10 +145,6 @@ class RolePanel(commands.Cog):
     print(
         f"🔄 ロールパネル復元: {restored}個 / 削除: {deleted}個", flush=True
     )
-
-  # ========================================
-  # /rolepanel
-  # ========================================
 
   @app_commands.command(
       name="rolepanel",
@@ -204,9 +189,6 @@ class RolePanel(commands.Cog):
       )
       return
 
-    # ========================================
-    # Bot Member 取得
-    # ========================================
     bot_member = guild.get_member(self.bot.user.id)
     if bot_member is None:
       try:
@@ -226,13 +208,10 @@ class RolePanel(commands.Cog):
       )
       return
 
-    # Botの最高ロールが取得できない場合（ロール未付与など）への安全対策
     bot_top_role = getattr(bot_member, "top_role", None)
     if bot_top_role is None:
       await interaction.followup.send(
-          "❌ Botの最高ロールが取得できませんでした。"
-          "Botにロールが割り当てられているか確認してください。",
-          ephemeral=True,
+          "❌ Botの最高ロールが取得できませんでした。", ephemeral=True
       )
       return
 
@@ -240,9 +219,7 @@ class RolePanel(commands.Cog):
     if invalid_roles:
       names = "\n".join(f"・{role.mention}" for role in invalid_roles)
       await interaction.followup.send(
-          "❌ 以下のロールはBotが操作できません。\n\n"
-          f"{names}\n\n"
-          "Botのロールを対象ロールより上に移動してください。",
+          "❌ 以下のロールはBotが操作できません。\n\n" f"{names}",
           ephemeral=True,
       )
       return
@@ -295,7 +272,7 @@ class RolePanel(commands.Cog):
       return
 
     view_roles = [(role.id, role.name) for role in roles]
-    view = RolePanelView(roles=view_roles)
+    view = RolePanelView(guild_id=guild.id, roles=view_roles)
 
     channel = interaction.channel
     try:
@@ -321,10 +298,6 @@ class RolePanel(commands.Cog):
       )
     except Exception as e:
       print(f"❌ パネル保存処理エラー: {e}", flush=True)
-
-  # ========================================
-  # /rolepanel_delete
-  # ========================================
 
   @app_commands.command(
       name="rolepanel_delete",
@@ -371,10 +344,5 @@ class RolePanel(commands.Cog):
       )
 
 
-# ========================================
-# Setup
-# ========================================
-
-
 async def setup(bot: commands.Bot):
-  await bot.add_cog(RolePanel(bot))
+  await bot.load_extension(bot, RolePanel(bot)) # type: ignore
