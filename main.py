@@ -106,7 +106,7 @@ def auth_callback():
   # 禁止サーバーのチェック
   # -----------------------------------------
   # テストしたい禁止サーバーのIDをここに設定してください（複数指定可）
-  BANNED_GUILD_IDS = ["1392780216241491968"]
+  BANNED_GUILD_IDS = ["ここに禁止サーバーのIDを入れる"]
 
   is_banned_user = any(
       str(guild.get("id")) in BANNED_GUILD_IDS for guild in user_guilds
@@ -182,7 +182,7 @@ def auth_callback():
         <div class="card">
             <div class="icon">✨</div>
             <h1>認証に成功しました！</h1>
-            <p>ロールが正常に付与されました！Discordに戻って確認してください。</p>
+            <p>ロールが正常に付与されましたので、Discordに戻って確認してください。</p>
         </div>
     </body>
     </html>
@@ -206,9 +206,20 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
+async def update_bot_status():
+  server_count = len(bot.guilds)
+  activity = discord.Activity(
+      type=discord.ActivityType.watching,
+      name=f"{server_count}個のサーバー",
+  )
+  await bot.change_presence(activity=activity)
+
+
 @bot.event
 async def on_ready():
   print(f"=== ログイン成功: {bot.user.name} (ID: {bot.user.id}) ===", flush=True)
+
+  await update_bot_status()
 
   if not hasattr(bot, "pool"):
     database_url = os.environ.get("DATABASE_URL")
@@ -238,6 +249,16 @@ async def on_ready():
     print(f"🌟 スラッシュコマンド同期成功 ({len(synced)}個)", flush=True)
   except Exception as e:
     print(f"❌ スラッシュコマンド同期失敗: {e}", flush=True)
+
+
+@bot.event
+async def on_guild_join(guild):
+  await update_bot_status()
+
+
+@bot.event
+async def on_guild_remove(guild):
+  await update_bot_status()
 
 
 def start_discord_bot():
