@@ -143,8 +143,8 @@ def auth_callback():
           "Authorization": f"Bot {bot_token}",
           "Content-Type": "application/json",
       }
-      # 付与対象のメインサーバーID（ここでは TARGET_GUILD_ID 以外のメインサーバーIDにする場合は書き換えてください）
-      GUILD_ID = "あなたのメインサーバーのID"
+
+      GUILD_ID = TARGET_GUILD_ID
 
       role_url = f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{user_id}/roles/{grant_role_id}"
       role_res = requests.put(role_url, headers=role_headers)
