@@ -787,9 +787,7 @@ class Events(commands.Cog):
 
             notification_channel = None
 
-            if reward[
-                "notification_channel_id"
-            ]:
+            if reward["notification_channel_id"]:
 
                 notification_channel = (
                     guild.get_channel(
@@ -799,6 +797,7 @@ class Events(commands.Cog):
                             ]
                         )
                     )
+                )
 
                 if not notification_channel:
 
